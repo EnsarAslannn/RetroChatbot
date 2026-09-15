@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="1998 yılından bağlanan nostaljik sohbet botu.">
+    <title>RetroChat 98 — İnternete Bağlan</title>
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body data-era="1998">
+    <a class="skip-link" href="#message-input">Mesaj alanına geç</a>
+
+    <div class="desktop" aria-hidden="true">
+      <span class="star star-one">✦</span>
+      <span class="star star-two">✦</span>
+      <span class="star star-three">·</span>
+    </div>
+
+    <main class="shell">
+      <header class="site-header">
+        <div class="brand-row">
+          <div id="wordmark" class="wordmark" aria-label="RetroChat 98">
+            <span id="wordmark-top" class="wordmark-top">RETRO</span>
+            <span id="wordmark-main" class="wordmark-main">CHAT <strong>98</strong></span>
+          </div>
+          <button id="era-toggle" class="era-toggle" type="button" aria-pressed="false">
+            <span class="era-orbit" aria-hidden="true"><i></i></span>
+            <span class="era-action">Modernleştir</span>
+            <small class="era-destination">2030'a geç</small>
+          </button>
+          <p id="tagline" class="tagline">Bilgi otoyolundaki<br>en havalı sohbet noktası!</p>
+        </div>
+        <div class="marquee" role="status">
+          <div id="marquee-track" class="marquee-track">★ HOŞ GELDİN NET GEZGİNİ! &nbsp; • &nbsp; EN İYİ 800×600 ÇÖZÜNÜRLÜKTE GÖRÜNTÜLENİR &nbsp; • &nbsp; MODEMİNİ HAZIRLA &nbsp; ★</div>
+        </div>
+      </header>
+
+      <section class="chat-window" aria-labelledby="window-title">
+        <div class="title-bar">
+          <div class="title-copy">
+            <span class="computer-icon" aria-hidden="true"></span>
+            <h1 id="window-title">RetroChat 98 — Sohbet Odası</h1>
+          </div>
+          <div class="window-controls" aria-hidden="true">
+            <span>_</span><span>□</span><span>×</span>
+          </div>
+        </div>
+
+        <div class="toolbar" aria-label="Sohbet durumu">
+          <span>Dosya</span><span>Düzen</span><span>Favoriler</span><span>Yardım</span>
+          <span id="connection" class="connection"><i></i> <b>56K BAĞLI</b></span>
+        </div>
+
+        <div id="chat-log" class="chat-log" role="log" aria-live="polite" aria-label="Sohbet mesajları">
+          <article class="message bot-message">
+            <div class="avatar bot-avatar" aria-hidden="true">R98</div>
+            <div class="bubble">
+              <span class="sender">RetroChat98</span>
+              <p>Selam net gezgini! Takvimler 1998'i gösteriyor. Modemin cızırtısı arasında sana nasıl yardımcı olabilirim?</p>
+              <time>şimdi</time>
+            </div>
+          </article>
+        </div>
+
+        <div id="typing" class="typing" hidden aria-live="polite">
+          <span class="modem-lights" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span id="typing-text">RetroChat98 hatta veri arıyor...</span>
+        </div>
+
+        <form id="chat-form" class="composer">
+          <label id="message-label" for="message-input">Mesajın:</label>
+          <div class="input-row">
+            <textarea id="message-input" name="message" rows="2" maxlength="2000" placeholder="Bir şeyler yaz..." required></textarea>
+            <button id="send-button" type="submit">GÖNDER <span aria-hidden="true">▶</span></button>
+          </div>
+          <div class="composer-meta">
+            <span>Enter: gönder · Shift+Enter: yeni satır</span>
+            <span id="char-count">0 / 2000</span>
+          </div>
+        </form>
+
+        <div class="status-bar">
+          <span id="status-text">Hazır</span>
+          <span id="status-zone" class="status-zone">Internet bölgesi</span>
+        </div>
+      </section>
+
+      <aside class="web-ring" aria-label="Site bilgisi">
+        <span>◀ ÖNCEKİ</span>
+        <strong>RETRO WEBRING</strong>
+        <span>SONRAKİ ▶</span>
+      </aside>
+
+      <footer>
+        <p id="footer-note">Bu sayfa sevgiyle ve düz HTML ile yapılmıştır.</p>
+        <p id="counter" class="counter">ZİYARETÇİ: <span>0001998</span></p>
+      </footer>
+    </main>
+
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>
