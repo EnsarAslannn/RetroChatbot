@@ -118,7 +118,7 @@ class HistoryItem(BaseModel):
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=2000)
     history: list[HistoryItem] = Field(default_factory=list, max_length=12)
-    era: Literal["1998", "2030"] = "1998"
+    era: Literal["1998", "2058"] = "1998"
 
     @field_validator("message")
     @classmethod

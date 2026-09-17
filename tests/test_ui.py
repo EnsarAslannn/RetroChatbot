@@ -93,8 +93,8 @@ def test_compare_asks_both_eras_without_adding_to_chat(page, server):
     page.locator("#compare-input").fill("İletişim nasıl?")
     page.get_by_role("button", name="Karşılaştır", exact=True).click()
     page.locator("#compare-1998").get_by_text("1998 yanıtı", exact=True).wait_for()
-    page.locator("#compare-2030").get_by_text("2030 yanıtı", exact=True).wait_for()
-    assert set(eras) == {"1998", "2030"}
+    page.locator("#compare-2058").get_by_text("2058 yanıtı", exact=True).wait_for()
+    assert set(eras) == {"1998", "2058"}
     assert page.locator(".user-message").count() == 0
 
 
@@ -113,7 +113,7 @@ def test_compare_error_clears_waiting_labels(page, server):
     page.locator('#compare-form button[type="submit"]').click()
     page.locator("#compare-error").wait_for(state="visible")
     assert "Yanıt bekleniyor..." not in page.locator("#compare-1998").text_content()
-    assert "Yanıt bekleniyor..." not in page.locator("#compare-2030").text_content()
+    assert "Yanıt bekleniyor..." not in page.locator("#compare-2058").text_content()
 
 
 def test_era_change_discards_old_pending_reply(page, server):
@@ -124,8 +124,32 @@ def test_era_change_discards_old_pending_reply(page, server):
     page.locator("#send-button").click()
     page.wait_for_function("() => document.querySelector('#cancel-button').hidden === false")
     page.get_by_role("button", name="Modernleştir").click()
-    assert page.locator("body").get_attribute("data-era") == "2030"
+    assert page.locator("body").get_attribute("data-era") == "2058"
+    assert page.get_by_role("heading", name="FutureChat 2058 — İletişim Merkezi").is_visible()
     assert page.locator("#chat-log").get_by_text("Eski soru", exact=True).count() == 0
+
+
+def test_old_2030_chats_remain_visible_without_becoming_2058_context(page, server):
+    page.add_init_script("""localStorage.setItem('retrochat-sessions-v1', JSON.stringify([{
+      id: 'old-chat', era: '2030', title: 'Eski soru', updated: 1,
+      messages: [{role: 'user', content: '2030 sorusu'}, {role: 'assistant', content: '2030 yanıtı'}]
+    }]));""")
+    histories = []
+
+    def answer(route):
+        histories.append(route.request.post_data_json["history"])
+        stream_response(route, "2058 yanıtı")
+
+    page.route("**/api/chat/stream", answer)
+    page.goto(server)
+    assert page.locator("body").get_attribute("data-era") == "2058"
+    assert page.get_by_role("button", name="2058 · 2030 arşivi · Eski soru").is_visible()
+    assert page.locator("#chat-log").get_by_text("2030 yanıtı", exact=True).is_visible()
+    page.locator("#message-input").fill("Yeni soru")
+    page.locator("#send-button").click()
+    page.locator("#chat-log").get_by_text("2058 yanıtı", exact=True).wait_for()
+    assert histories == [[]]
+    assert page.get_by_role("button", name="2058 · 2030 arşivi · Yeni soru").is_visible()
 
 
 def test_saved_chat_is_a_keyboard_accessible_button(page, server):

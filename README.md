@@ -1,26 +1,28 @@
-# RetroChat 98 / NovaChat 30
+# RetroChat 98 / FutureChat 2058
 
-1998 internet kültürü ile kurgusal bir 2030 geleceği arasında geçiş yapılan, Gemini destekli Türkçe sohbet deneyimi. Aynı soruyu iki döneme sorup yanıtları yan yana karşılaştırabilirsiniz.
+1998 internet kültürü ile kurgusal bir 2058 geleceği arasında geçiş yapılan, Gemini destekli Türkçe sohbet deneyimi. Aynı soruyu iki döneme sorup yanıtları yan yana karşılaştırabilirsiniz.
 
-> **2030 modu bir gelecek kurgusudur.** Yanıtları gerçekleşmiş olay veya doğrulanmış öngörü olarak kullanmayın.
+> **2058 modu bir gelecek kurgusudur.** Yanıtları gerçekleşmiş olay veya doğrulanmış öngörü olarak kullanmayın.
 
 ## Kısa demo
 
 - [Kısa kullanım videosu](demo/retrochat-demo.mp4)
 - [Masaüstü karşılaştırma ekranı](demo/desktop.png)
 - [Mobil karşılaştırma ekranı](demo/mobile.png)
-- [2030 görünümü](demo/future.png)
+- [2058 görünümü](demo/future.png)
 
 Demo medyası `scripts/capture_demo.py` ile örnek yanıtlar kullanılarak üretildi; gerçek Gemini çıktısı değildir. Canlı ürünü kullanmak için kendi API anahtarınız gerekir.
 
 ## Özellikler
 
-- 1998 ve 2030 kişilikleri arasında geçiş; her dönemin sohbeti ayrı tutulur.
+- 1998 ve 2058 kişilikleri arasında geçiş; her dönemin sohbeti ayrı tutulur.
 - Aynı sorunun iki dönemdeki yanıtını eş zamanlı karşılaştırma.
 - Akış hâlinde görünen yanıtlar, bekleyen isteği durdurma, anlaşılır hata ve tek tıkla tekrar deneme.
 - Bu cihazda saklanan sohbetler; yeni sohbet açma, eski sohbeti seçme ve silme.
+- Önceki 2030 sohbetleri arşiv etiketiyle korunur; yeni 2058 yanıtlarına eski dönem konuşması bağlam olarak gönderilmez.
 - Örnek sorular, mobil düzen, klavye kullanımı, ekran okuyucu duyuruları ve azaltılmış hareket desteği.
 - Sunucuda istek sınırı, zaman aşımı, kodlu hatalar ve mesaj içeriği toplamayan ölçümler.
+- Model token sınırına ulaşırsa yanıtı devam ettirme; tamamlanamayan yanıtı bitmiş gibi kaydetmeme.
 
 ## Yerelde çalıştırma
 

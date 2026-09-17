@@ -18,20 +18,20 @@ const eraContent = {
     window: "RetroChat 98 — Sohbet Odası", connection: "56K BAĞLI", typing: "RetroChat98 hatta veri arıyor...",
     label: "Mesajın:", placeholder: "Bir şeyler yaz...", zone: "Internet bölgesi",
     footer: "Bu sayfa sevgiyle ve düz HTML ile yapılmıştır.", counter: "ZİYARETÇİ: <span>0001998</span>",
-    action: "Modernleştir", destination: "2030'a geç",
+    action: "Modernleştir", destination: "2058'e geç",
     welcome: "Selam net gezgini! Takvimler 1998'i gösteriyor. Modemin cızırtısı arasında sana nasıl yardımcı olabilirim?",
     disclaimer: "1998 dönemi canlandırması. Yanıtları önemli kararlar için doğrula."
   },
-  "2030": {
-    title: "NovaChat 30 — Geleceğe Bağlan", brand: "NOVA", year: "30",
+  "2058": {
+    title: "FutureChat 2058 — Geleceğe Bağlan", brand: "FUTURE", year: "58",
     tagline: "Yarının düşünceleri,<br>şimdi aynı frekansta.",
-    marquee: "SİNYAL KARARLI / 2030 İLETİŞİM AĞI ÇEVRİMİÇİ / GELECEĞİ KEŞFET",
-    window: "NovaChat 30 — İletişim Merkezi", connection: "NOVA AĞI AKTİF", typing: "NovaChat30 olasılıkları hesaplıyor...",
-    label: "İletini yaz", placeholder: "2030'a bir soru gönder...", zone: "Gelecek kurgusu · 2030",
+    marquee: "SİNYAL KARARLI / 2058 İLETİŞİM AĞI ÇEVRİMİÇİ / GELECEĞİ KEŞFET",
+    window: "FutureChat 2058 — İletişim Merkezi", connection: "FUTURE AĞI AKTİF", typing: "FutureChat2058 olasılıkları hesaplıyor...",
+    label: "İletini yaz", placeholder: "2058'e bir soru gönder...", zone: "Gelecek kurgusu · 2058",
     footer: "İnsan merakı ile yeni nesil zekânın buluşma noktası.", counter: "SİNYAL <span>KARARLI</span>",
     action: "1998'e dön", destination: "retro moda geç",
-    welcome: "2030 bağlantısı kuruldu. Ben NovaChat30. Yeni dünyanın içinden sana nasıl yardımcı olabilirim?",
-    disclaimer: "2030 yanıtları yaratıcı bir gelecek kurgusudur; doğrulanmış öngörü değildir."
+    welcome: "2058 bağlantısı kuruldu. Ben FutureChat2058. Geleceğin içinden sana nasıl yardımcı olabilirim?",
+    disclaimer: "2058 yanıtları yaratıcı bir gelecek kurgusudur; doğrulanmış öngörü değildir."
   }
 };
 
@@ -39,9 +39,14 @@ function readSessions() {
   try {
     const value = JSON.parse(localStorage.getItem(storageKey) || "[]");
     if (!Array.isArray(value)) return [];
-    return value.filter((item) => item && typeof item.id === "string" && ["1998", "2030"].includes(item.era) && Array.isArray(item.messages))
-      .slice(0, 30).map((item) => ({ ...item, messages: item.messages.filter((message) =>
-        ["user", "assistant"].includes(message.role) && typeof message.content === "string").slice(-100) }));
+    return value.filter((item) => item && typeof item.id === "string" && ["1998", "2030", "2058"].includes(item.era) && Array.isArray(item.messages))
+      .slice(0, 30).map((item) => {
+        const messages = item.messages.filter((message) =>
+          ["user", "assistant"].includes(message.role) && typeof message.content === "string").slice(-100);
+        return item.era === "2030"
+          ? { ...item, era: "2058", title: `2030 arşivi · ${item.title}`, messages, legacyMessageCount: messages.length }
+          : { ...item, messages };
+      });
   } catch { return []; }
 }
 
@@ -69,10 +74,10 @@ function addMessage(role, content, label = timeLabel()) {
   const avatar = document.createElement("div");
   avatar.className = `avatar ${role === "user" ? "user-avatar" : "bot-avatar"}`;
   avatar.setAttribute("aria-hidden", "true");
-  avatar.textContent = role === "user" ? "SEN" : era === "2030" ? "N30" : "R98";
+  avatar.textContent = role === "user" ? "SEN" : era === "2058" ? "F58" : "R98";
   const bubble = document.createElement("div"); bubble.className = "bubble";
   const sender = document.createElement("span"); sender.className = "sender";
-  sender.textContent = role === "user" ? "Sen" : era === "2030" ? "NovaChat30" : "RetroChat98";
+  sender.textContent = role === "user" ? "Sen" : era === "2058" ? "FutureChat2058" : "RetroChat98";
   const paragraph = document.createElement("p"); paragraph.textContent = content;
   const time = document.createElement("time"); time.textContent = label;
   bubble.append(sender, paragraph, time); article.append(avatar, bubble); chatLog.append(article);
@@ -99,9 +104,9 @@ function renderSessions() {
 function renderEra() {
   const content = eraContent[era];
   document.body.dataset.era = era; document.title = content.title;
-  $("#era-toggle").setAttribute("aria-pressed", String(era === "2030"));
+  $("#era-toggle").setAttribute("aria-pressed", String(era === "2058"));
   $(".era-action").textContent = content.action; $(".era-destination").textContent = content.destination;
-  $("#wordmark").setAttribute("aria-label", era === "2030" ? "NovaChat 30" : "RetroChat 98");
+  $("#wordmark").setAttribute("aria-label", era === "2058" ? "FutureChat 2058" : "RetroChat 98");
   $("#wordmark-top").textContent = content.brand;
   $("#wordmark-main").innerHTML = `CHAT <strong>${content.year}</strong>`;
   $("#tagline").innerHTML = content.tagline; $("#marquee-track").textContent = content.marquee;
@@ -110,13 +115,14 @@ function renderEra() {
   input.placeholder = content.placeholder; $("#status-zone").textContent = content.zone;
   $("#footer-note").textContent = content.footer; $("#counter").innerHTML = content.counter;
   $("#era-disclaimer").textContent = content.disclaimer;
-  statusText.textContent = era === "2030" ? "Sistem hazır" : "Hazır";
+  statusText.textContent = era === "2058" ? "Sistem hazır" : "Hazır";
 }
 
 function clearError() { chatError.hidden = true; failedIndex = null; }
 function render() {
   renderEra(); renderSessions(); clearError(); chatLog.replaceChildren();
   const session = currentSession();
+  if (session?.legacyMessageCount) $("#era-disclaimer").textContent += " Önceki 2030 sohbeti arşivlendi; yeni yanıtlar 2058 döneminden gelir.";
   if (!session?.messages.length) addMessage("assistant", eraContent[era].welcome, "şimdi");
   else for (const message of session.messages) addMessage(message.role, message.content, message.time || "önce");
   if (session?.messages.at(-1)?.role === "user") {
@@ -131,7 +137,7 @@ function setBusy(busy, kind = "chat") {
   typing.hidden = !busy || kind !== "chat"; cancelButton.hidden = !busy || kind !== "chat";
   $("#compare-cancel").hidden = !busy || kind !== "compare";
   $("#compare-input").disabled = busy; compareForm.querySelector('button[type="submit"]').disabled = busy;
-  statusText.textContent = busy ? kind === "compare" ? "İki dönem yanıtlıyor..." : "Yanıt bekleniyor..." : era === "2030" ? "Sistem hazır" : "Hazır";
+  statusText.textContent = busy ? kind === "compare" ? "İki dönem yanıtlıyor..." : "Yanıt bekleniyor..." : era === "2058" ? "Sistem hazır" : "Hazır";
 }
 
 function cancelActive() {
@@ -181,11 +187,12 @@ async function streamReply(message, history, selectedEra, signal, onChunk) {
 async function runChat(message, retryAt = null) {
   if (activeRequest) return;
   const session = currentSession(), index = retryAt === null ? session.messages.length : retryAt;
-  const history = session.messages.slice(0, index).slice(-12).map(({ role, content }) => ({ role, content }));
+  const history = session.messages.slice(Math.max(0, index - 12, session.legacyMessageCount || 0), index).map(({ role, content }) => ({ role, content }));
   if (retryAt === null) {
     if (index === 0) sendEvent("chat_started");
     session.messages.push({ role: "user", content: message, time: timeLabel() });
-    session.title = message.length > 30 ? `${message.slice(0, 30)}…` : message;
+    const title = message.length > 30 ? `${message.slice(0, 30)}…` : message;
+    session.title = session.legacyMessageCount ? `2030 arşivi · ${title}` : title;
     session.updated = Date.now(); persist();
     if (index === 0) chatLog.replaceChildren();
     addMessage("user", message); renderSessions();
@@ -202,7 +209,7 @@ async function runChat(message, retryAt = null) {
     if (!reply.trim()) throw new Error("Boş yanıt alındı. Tekrar dene.");
     session.messages.push({ role: "assistant", content: reply, time: timeLabel() });
     session.updated = Date.now(); persist();
-    announcement.textContent = `${era === "2030" ? "NovaChat30" : "RetroChat98"} yanıtladı: ${reply}`;
+    announcement.textContent = `${era === "2058" ? "FutureChat2058" : "RetroChat98"} yanıtladı: ${reply}`;
   } catch (error) {
     if (activeRequest !== request) return;
     request.placeholder.article.remove(); failedIndex = index;
@@ -224,7 +231,7 @@ $("#retry-button").addEventListener("click", () => {
 cancelButton.addEventListener("click", () => activeRequest?.controller.abort());
 $("#era-toggle").addEventListener("click", () => {
   cancelActive();
-  const nextEra = era === "1998" ? "2030" : "1998", existing = sessions.find((item) => item.era === nextEra);
+  const nextEra = era === "1998" ? "2058" : "1998", existing = sessions.find((item) => item.era === nextEra);
   if (existing) { activeId = existing.id; era = nextEra; render(); } else newSession(nextEra);
   announcement.textContent = `${nextEra} dönemine geçildi. ${eraContent[nextEra].disclaimer}`; input.focus();
 });
@@ -259,11 +266,11 @@ compareForm.addEventListener("submit", async (event) => {
   if (!question || activeRequest) return;
   sendEvent("comparison_started");
   $("#compare-error").hidden = true; compareResults.hidden = false;
-  $("#compare-1998").textContent = "Yanıt bekleniyor..."; $("#compare-2030").textContent = "Yanıt bekleniyor...";
+  $("#compare-1998").textContent = "Yanıt bekleniyor..."; $("#compare-2058").textContent = "Yanıt bekleniyor...";
   const controller = new AbortController(), request = { controller, kind: "compare" };
   activeRequest = request; setBusy(true, "compare");
   try {
-    await Promise.all(["1998", "2030"].map(async (selectedEra) => {
+    await Promise.all(["1998", "2058"].map(async (selectedEra) => {
       const target = $(`#compare-${selectedEra}`);
       const reply = await streamReply(question, [], selectedEra, controller.signal, (text) => {
         if (activeRequest === request) target.textContent = text;
@@ -275,7 +282,7 @@ compareForm.addEventListener("submit", async (event) => {
     if (activeRequest === request) {
       controller.abort(); $("#compare-error").textContent = error.name === "AbortError" ? "Karşılaştırma durduruldu." : error.message;
       $("#compare-error").hidden = false;
-      for (const selectedEra of ["1998", "2030"]) {
+      for (const selectedEra of ["1998", "2058"]) {
         const target = $(`#compare-${selectedEra}`);
         if (target.textContent === "Yanıt bekleniyor...") target.textContent = error.name === "AbortError" ? "Karşılaştırma durduruldu." : "Yanıt alınamadı.";
       }

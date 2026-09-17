@@ -143,13 +143,13 @@ def test_chat_endpoint_forwards_the_selected_era():
         with TestClient(app) as client:
             response = client.post(
                 "/api/chat",
-                json={"message": "Hangi yıldayız?", "era": "2030"},
+                json={"message": "Hangi yıldayız?", "era": "2058"},
             )
     finally:
         app.dependency_overrides.clear()
 
     assert response.status_code == 200
-    assert response.json() == {"reply": "2030 bağlantısından: Hangi yıldayız?"}
+    assert response.json() == {"reply": "2058 bağlantısından: Hangi yıldayız?"}
 
 
 def test_chat_endpoint_rejects_an_unknown_era():

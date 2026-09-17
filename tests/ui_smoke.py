@@ -14,8 +14,8 @@ def verify_page(page, screenshot_name):
     def answer_chat(route):
         request = route.request.post_data_json
         reply = (
-            "2030 bağlantısı aktif. Geleceğe hoş geldin."
-            if request["era"] == "2030"
+            "2058 bağlantısı aktif. Geleceğe hoş geldin."
+            if request["era"] == "2058"
             else "1998 bağlantısı aktif. IRC dostları burada."
         )
         route.fulfill(
@@ -34,13 +34,13 @@ def verify_page(page, screenshot_name):
     assert page.get_by_role("heading", name="RetroChat 98 — Sohbet Odası").is_visible()
 
     page.get_by_role("button", name="Modernleştir").click()
-    assert page.locator("body").get_attribute("data-era") == "2030"
-    assert page.get_by_role("heading", name="NovaChat 30 — İletişim Merkezi").is_visible()
+    assert page.locator("body").get_attribute("data-era") == "2058"
+    assert page.get_by_role("heading", name="FutureChat 2058 — İletişim Merkezi").is_visible()
     assert page.get_by_role("button", name="1998'e dön").is_visible()
 
     page.locator("#message-input").fill("İnternetin geleceği nasıl?")
     page.get_by_role("button", name="GÖNDER").click()
-    page.locator("#chat-log").get_by_text("2030 bağlantısı aktif. Geleceğe hoş geldin.", exact=True).wait_for()
+    page.locator("#chat-log").get_by_text("2058 bağlantısı aktif. Geleceğe hoş geldin.", exact=True).wait_for()
     assert page.locator(".message").count() == 2
     assert not console_errors
 

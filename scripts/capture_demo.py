@@ -31,7 +31,7 @@ def answer(route):
     if era == "1998":
         reply = "1998'de sohbet için IRC kanallarına bağlanır, e-posta gönderir ya da telefonda konuşurduk."
     else:
-        reply = "2030 kurgusunda uzamsal arayüzler ve akıllı yardımcılar iletişimin parçası olabilir."
+        reply = "2058 kurgusunda uzamsal arayüzler ve akıllı yardımcılar iletişimin parçası olabilir."
     body = f"event: chunk\ndata: {json.dumps({'text': reply}, ensure_ascii=False)}\n\nevent: done\ndata: {{}}\n\n"
     route.fulfill(status=200, content_type="text/event-stream", body=body)
 
@@ -61,7 +61,7 @@ def main():
             page.get_by_role("button", name="İki dönemi karşılaştır").click()
             page.locator("#compare-input").fill("Arkadaşlarınla nasıl iletişim kurarsın?")
             page.get_by_role("button", name="Karşılaştır", exact=True).click()
-            page.locator("#compare-2030").get_by_text("2030 kurgusunda", exact=False).wait_for()
+            page.locator("#compare-2058").get_by_text("2058 kurgusunda", exact=False).wait_for()
             page.evaluate("document.activeElement.blur(); window.scrollTo(0, 0)")
             page.screenshot(path=str(OUTPUT / "desktop.png"), full_page=True)
             page.wait_for_timeout(1800)
@@ -85,7 +85,7 @@ def main():
             mobile_page.get_by_role("button", name="İki dönemi karşılaştır").click()
             mobile_page.locator("#compare-input").fill("İletişim nasıl değişir?")
             mobile_page.get_by_role("button", name="Karşılaştır", exact=True).click()
-            mobile_page.locator("#compare-2030").get_by_text("2030 kurgusunda", exact=False).wait_for()
+            mobile_page.locator("#compare-2058").get_by_text("2058 kurgusunda", exact=False).wait_for()
             mobile_page.evaluate("document.activeElement.blur(); window.scrollTo(0, 0)")
             mobile_page.screenshot(path=str(OUTPUT / "mobile.png"), full_page=True)
             assert mobile_page.evaluate("document.documentElement.scrollWidth <= innerWidth")
