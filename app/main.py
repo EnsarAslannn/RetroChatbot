@@ -95,7 +95,11 @@ def service_error(exc: Exception) -> HTTPException:
         return HTTPException(503, detail={"code": "upstream_busy", "message": "Gemini hatları şu an meşgul. Birkaç saniye sonra tekrar dene."})
     if isinstance(exc, (ConnectError, ConnectTimeout)):
         return HTTPException(503, detail={"code": "upstream_unreachable", "message": "Model hizmetine bağlanılamıyor. Sunucunun internet bağlantısını kontrol edip tekrar dene."})
-    return HTTPException(502, detail={"code": "upstream_error", "message": "Sohbet hizmetine bağlanılamadı. Tekrar dene."})
+    detail = {"code": "upstream_error", "message": "Sohbet hizmetine bağlanılamadı. Tekrar dene.", "error_type": type(exc).__name__}
+    provider_code = getattr(exc, "code", None)
+    if isinstance(provider_code, int) and 400 <= provider_code <= 599:
+        detail["provider_code"] = provider_code
+    return HTTPException(502, detail=detail)
 
 
 def log_service_failure(exc: Exception) -> None:

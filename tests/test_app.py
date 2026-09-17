@@ -65,6 +65,14 @@ class RestrictedKeyStreamingService:
         yield ""
 
 
+class UnclassifiedStreamingService:
+    def stream_reply(self, message, history, era="1998"):
+        error = RuntimeError("secret-provider-detail")
+        error.code = 429
+        raise error
+        yield ""
+
+
 def test_health_endpoint_reports_ready():
     with TestClient(app) as client:
         response = client.get("/api/health")
@@ -242,6 +250,20 @@ def test_stream_explains_provider_permission_denial():
     assert response.status_code == 200
     assert '"code":"upstream_forbidden"' in response.text
     assert "erişimi reddedildi" in response.text
+
+
+def test_stream_generic_error_exposes_only_safe_diagnostic_fields():
+    app.dependency_overrides[get_chat_service] = lambda: UnclassifiedStreamingService()
+    try:
+        with TestClient(app) as client:
+            response = client.post("/api/chat/stream", json={"message": "Merhaba"})
+    finally:
+        app.dependency_overrides.clear()
+    assert response.status_code == 200
+    assert '"code":"upstream_error"' in response.text
+    assert '"provider_code":429' in response.text
+    assert '"error_type":"RuntimeError"' in response.text
+    assert "secret-provider-detail" not in response.text
 
 
 def test_missing_api_key_uses_structured_error(monkeypatch):
