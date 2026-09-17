@@ -1,14 +1,28 @@
-# RetroChat 98
+# RetroChat 98 / NovaChat 30
 
-1998 yılında yaşadığına inanan, Gemini destekli eğitim amaçlı bir sohbet botu.
-Backend FastAPI; arayüz düz HTML, CSS ve JavaScript ile hazırlanmıştır.
+1998 internet kültürü ile kurgusal bir 2030 geleceği arasında geçiş yapılan, Gemini destekli Türkçe sohbet deneyimi. Aynı soruyu iki döneme sorup yanıtları yan yana karşılaştırabilirsiniz.
 
-Sayfanın üstündeki **Modernleştir** düğmesi arayüzü NovaChat 30 görünümüne
-dönüştürür ve chatbotun kendisini 2030 yılında sanmasını sağlar. Aynı düğmeyle
-1998 görünümüne geri dönülebilir. Dönem değiştirildiğinde iki kişiliğin sohbet
-bağlamları karışmasın diye ekrandaki oturum sıfırlanır.
+> **2030 modu bir gelecek kurgusudur.** Yanıtları gerçekleşmiş olay veya doğrulanmış öngörü olarak kullanmayın.
 
-## Kurulum
+## Kısa demo
+
+- [Kısa kullanım videosu](demo/retrochat-demo.mp4)
+- [Masaüstü karşılaştırma ekranı](demo/desktop.png)
+- [Mobil karşılaştırma ekranı](demo/mobile.png)
+- [2030 görünümü](demo/future.png)
+
+Demo medyası `scripts/capture_demo.py` ile örnek yanıtlar kullanılarak üretildi; gerçek Gemini çıktısı değildir. Canlı ürünü kullanmak için kendi API anahtarınız gerekir.
+
+## Özellikler
+
+- 1998 ve 2030 kişilikleri arasında geçiş; her dönemin sohbeti ayrı tutulur.
+- Aynı sorunun iki dönemdeki yanıtını eş zamanlı karşılaştırma.
+- Akış hâlinde görünen yanıtlar, bekleyen isteği durdurma, anlaşılır hata ve tek tıkla tekrar deneme.
+- Bu cihazda saklanan sohbetler; yeni sohbet açma, eski sohbeti seçme ve silme.
+- Örnek sorular, mobil düzen, klavye kullanımı, ekran okuyucu duyuruları ve azaltılmış hareket desteği.
+- Sunucuda istek sınırı, zaman aşımı, kodlu hatalar ve mesaj içeriği toplamayan ölçümler.
+
+## Yerelde çalıştırma
 
 ```powershell
 python -m venv .venv
@@ -17,19 +31,48 @@ python -m pip install -r requirements-dev.txt
 Copy-Item .env.example .env
 ```
 
-`.env` dosyasını açıp `GEMINI_API_KEY` değerini kendi anahtarınızla değiştirin.
-Anahtar yalnızca backend tarafından okunur ve tarayıcıya gönderilmez.
-
-## Çalıştırma
+`.env` içindeki `GEMINI_API_KEY` değerini ayarlayın. Anahtar yalnızca sunucuda okunur.
 
 ```powershell
 uvicorn app.main:app --reload
 ```
 
-Ardından `http://127.0.0.1:8000` adresini açın.
+Ardından `http://127.0.0.1:8000` adresini açın. İlk ekranda örnek sorulara basabilir veya **İki dönemi karşılaştır** düğmesini kullanabilirsiniz. Sohbetler tarayıcının `localStorage` alanına yazılır; aynı cihazdaki başka kullanıcılar bu tarayıcı profilini paylaşırsa sohbetleri görebilir. **Bu sohbeti sil** düğmesi ilgili kaydı kaldırır. Sunucuda sohbet geçmişi saklanmaz; Gemini isteğini oluşturmak için son 12 mesaj tarayıcıdan gönderilir.
 
-## Testler
+## Mimari
+
+```mermaid
+flowchart LR
+  B[Tarayıcı: HTML/CSS/JS] -->|POST /api/chat/stream| A[FastAPI]
+  B --> L[(Tarayıcı localStorage)]
+  A --> R[İstek sınırı ve zaman aşımı]
+  R --> G[Gemini API]
+  A --> M[Toplu sayaçlar /api/metrics]
+```
+
+`/api/chat/stream` Server-Sent Events biçiminde `chunk`, `done` ve `error` olayları döndürür. Karşılaştırma iki ayrı istek gönderir; sohbet geçmişini değiştirmez. `/api/chat` önceki JSON sözleşmesi için korunmuştur. `GET /api/health` temel canlılık kontrolüdür.
+
+Hata yanıtlarında `detail.code` ve `detail.message` alanları bulunur. Kodlar: `not_configured`, `rate_limited`, `upstream_busy`, `upstream_timeout`, `upstream_error`. Akış başladıktan sonraki hatalar HTTP gövdesinde `event: error` olarak iletilir.
+
+`POST /api/events` yalnızca `page_view`, `chat_started`, `retry` veya `comparison_started` olay adını kabul eder; mesaj içeriğini reddeder. `GET /api/metrics` bu sayaçları, toplam kabul edilen sohbet isteklerini, başarıyı, hatayı, zaman aşımını, ortalama yanıt süresini ve sayfa görüntülemesi başına sohbet başlatma ile istek başına tekrar deneme oranlarını döndürür. Bir sayfa görüntülemesinde birden fazla yeni sohbet açılabildiği için ilk oran 1'i aşabilir. Ölçümler yalnızca bellektedir; süreç yeniden başlayınca sıfırlanır. Soru ve yanıt metinleri ölçümlere veya uygulama loglarına yazılmaz. İstek sınırına takılan çağrılar kabul edilen sohbet isteği sayısına dahil değildir.
+
+## Ayarlar ve yayımlama
+
+| Değişken | Açıklama | Varsayılan |
+|---|---|---|
+| `GEMINI_API_KEY` | Zorunlu Gemini anahtarı | Yok |
+| `GEMINI_MODEL` | Birincil model | `gemini-flash-latest` |
+| `GEMINI_FALLBACK_MODEL` | 503 durumunda yedek model | `gemini-3.6-flash` |
+| `CHAT_RATE_LIMIT` | IP başına dakikalık sohbet isteği | `20` |
+| `CHAT_TIMEOUT_SECONDS` | Yanıt için üst süre | `30` |
+
+Üretimde HTTPS arkasında `uvicorn app.main:app --host 0.0.0.0 --port 8000` komutuyla çalıştırın ve anahtarı barındırma ortamının gizli değişkenlerinde tutun. Mevcut istek sınırı ve ölçümler **süreç başına bellekte** tutulur; birden fazla sunucu örneği için paylaşılan bir depo ve merkezi ölçüm sistemi gerekir. İstemcide durdurulan bir istek, sağlayıcıya ulaşmışsa kullanım maliyeti doğurabilir.
+
+## Test ve demo üretimi
 
 ```powershell
 python -m pytest tests -q -p no:cacheprovider
+python scripts/capture_demo.py
 ```
+
+Tarayıcı testleri Chromium gerektirir; gerekirse `python -m playwright install chromium` çalıştırın. Demo videosunu yeniden üretmek için FFmpeg gerekir. API ve model hizmeti testleri dış API'ye bağlanmaz; tarayıcı testleri akış yanıtlarını kontrollü olarak taklit eder.

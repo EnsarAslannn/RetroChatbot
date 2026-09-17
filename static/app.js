@@ -1,191 +1,283 @@
-const form = document.querySelector("#chat-form");
-const input = document.querySelector("#message-input");
-const chatLog = document.querySelector("#chat-log");
-const sendButton = document.querySelector("#send-button");
-const typing = document.querySelector("#typing");
-const statusText = document.querySelector("#status-text");
-const charCount = document.querySelector("#char-count");
-const eraToggle = document.querySelector("#era-toggle");
-const eraAction = document.querySelector(".era-action");
-const eraDestination = document.querySelector(".era-destination");
-const wordmark = document.querySelector("#wordmark");
-const wordmarkTop = document.querySelector("#wordmark-top");
-const wordmarkMain = document.querySelector("#wordmark-main");
-const tagline = document.querySelector("#tagline");
-const marqueeTrack = document.querySelector("#marquee-track");
-const windowTitle = document.querySelector("#window-title");
-const connection = document.querySelector("#connection b");
-const typingText = document.querySelector("#typing-text");
-const messageLabel = document.querySelector("#message-label");
-const statusZone = document.querySelector("#status-zone");
-const footerNote = document.querySelector("#footer-note");
-const counter = document.querySelector("#counter");
+const $ = (s) => document.querySelector(s);
+const input = $("#message-input"), chatLog = $("#chat-log"), statusText = $("#status-text");
+const typing = $("#typing"), cancelButton = $("#cancel-button"), announcement = $("#announcement");
+const chatError = $("#chat-error"), comparePanel = $("#compare-panel"), compareResults = $("#compare-results");
+const storageKey = "retrochat-sessions-v1";
 
-const history = [];
-let era = "1998";
-
+function sendEvent(event) {
+  fetch("/api/events", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ event }), keepalive: true
+  }).catch(() => {});
+}
 const eraContent = {
   "1998": {
-    title: "RetroChat 98 — İnternete Bağlan",
-    brandLabel: "RetroChat 98",
-    brandTop: "RETRO",
-    brandYear: "98",
+    title: "RetroChat 98 — İnternete Bağlan", brand: "RETRO", year: "98",
     tagline: "Bilgi otoyolundaki<br>en havalı sohbet noktası!",
-    marquee: "★ HOŞ GELDİN NET GEZGİNİ!   •   EN İYİ 800×600 ÇÖZÜNÜRLÜKTE GÖRÜNTÜLENİR   •   MODEMİNİ HAZIRLA   ★",
-    windowTitle: "RetroChat 98 — Sohbet Odası",
-    connection: "56K BAĞLI",
-    typing: "RetroChat98 hatta veri arıyor...",
-    label: "Mesajın:",
-    placeholder: "Bir şeyler yaz...",
-    zone: "Internet bölgesi",
-    footer: "Bu sayfa sevgiyle ve düz HTML ile yapılmıştır.",
-    counter: "ZİYARETÇİ: <span>0001998</span>",
-    action: "Modernleştir",
-    destination: "2030'a geç",
+    marquee: "★ HOŞ GELDİN NET GEZGİNİ! · EN İYİ 800×600 ÇÖZÜNÜRLÜKTE GÖRÜNTÜLENİR · MODEMİNİ HAZIRLA ★",
+    window: "RetroChat 98 — Sohbet Odası", connection: "56K BAĞLI", typing: "RetroChat98 hatta veri arıyor...",
+    label: "Mesajın:", placeholder: "Bir şeyler yaz...", zone: "Internet bölgesi",
+    footer: "Bu sayfa sevgiyle ve düz HTML ile yapılmıştır.", counter: "ZİYARETÇİ: <span>0001998</span>",
+    action: "Modernleştir", destination: "2030'a geç",
     welcome: "Selam net gezgini! Takvimler 1998'i gösteriyor. Modemin cızırtısı arasında sana nasıl yardımcı olabilirim?",
+    disclaimer: "1998 dönemi canlandırması. Yanıtları önemli kararlar için doğrula."
   },
   "2030": {
-    title: "NovaChat 30 — Geleceğe Bağlan",
-    brandLabel: "NovaChat 30",
-    brandTop: "NOVA",
-    brandYear: "30",
+    title: "NovaChat 30 — Geleceğe Bağlan", brand: "NOVA", year: "30",
     tagline: "Yarının düşünceleri,<br>şimdi aynı frekansta.",
-    marquee: "SİNYAL KARARLI   /   KUANTUM GÜVENLİ KANAL   /   2030 İLETİŞİM AĞI ÇEVRİMİÇİ",
-    windowTitle: "NovaChat 30 — İletişim Merkezi",
-    connection: "NOVA AĞI AKTİF",
-    typing: "NovaChat30 olasılıkları hesaplıyor...",
-    label: "İletini yaz",
-    placeholder: "2030'a bir soru gönder...",
-    zone: "Güvenli ağ · 2030",
-    footer: "İnsan merakı ile yeni nesil zekânın buluşma noktası.",
-    counter: "SİNYAL <span>KARARLI</span>",
-    action: "1998'e dön",
-    destination: "retro moda geç",
+    marquee: "SİNYAL KARARLI / 2030 İLETİŞİM AĞI ÇEVRİMİÇİ / GELECEĞİ KEŞFET",
+    window: "NovaChat 30 — İletişim Merkezi", connection: "NOVA AĞI AKTİF", typing: "NovaChat30 olasılıkları hesaplıyor...",
+    label: "İletini yaz", placeholder: "2030'a bir soru gönder...", zone: "Gelecek kurgusu · 2030",
+    footer: "İnsan merakı ile yeni nesil zekânın buluşma noktası.", counter: "SİNYAL <span>KARARLI</span>",
+    action: "1998'e dön", destination: "retro moda geç",
     welcome: "2030 bağlantısı kuruldu. Ben NovaChat30. Yeni dünyanın içinden sana nasıl yardımcı olabilirim?",
-  },
+    disclaimer: "2030 yanıtları yaratıcı bir gelecek kurgusudur; doğrulanmış öngörü değildir."
+  }
 };
 
-function currentTime() {
-  return new Intl.DateTimeFormat("tr-TR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date());
+function readSessions() {
+  try {
+    const value = JSON.parse(localStorage.getItem(storageKey) || "[]");
+    if (!Array.isArray(value)) return [];
+    return value.filter((item) => item && typeof item.id === "string" && ["1998", "2030"].includes(item.era) && Array.isArray(item.messages))
+      .slice(0, 30).map((item) => ({ ...item, messages: item.messages.filter((message) =>
+        ["user", "assistant"].includes(message.role) && typeof message.content === "string").slice(-100) }));
+  } catch { return []; }
 }
 
-function addMessage(role, content) {
+let sessions = readSessions(), activeId = sessions[0]?.id || null, era = sessions[0]?.era || "1998";
+let activeRequest = null, failedIndex = null;
+const currentSession = () => sessions.find((item) => item.id === activeId);
+const timeLabel = () => new Intl.DateTimeFormat("tr-TR", { hour: "2-digit", minute: "2-digit" }).format(new Date());
+
+function persist() {
+  sessions.sort((a, b) => b.updated - a.updated);
+  sessions = sessions.slice(0, 30);
+  try { localStorage.setItem(storageKey, JSON.stringify(sessions)); }
+  catch { statusText.textContent = "Bu cihazda sohbet kaydedilemedi"; }
+}
+
+function newSession(selectedEra = era) {
+  const session = { id: crypto.randomUUID(), era: selectedEra, title: "Yeni sohbet", messages: [], updated: Date.now() };
+  sessions.unshift(session); activeId = session.id; era = selectedEra;
+  persist(); render(); return session;
+}
+
+function addMessage(role, content, label = timeLabel()) {
   const article = document.createElement("article");
   article.className = `message ${role === "user" ? "user-message" : "bot-message"}`;
-
   const avatar = document.createElement("div");
   avatar.className = `avatar ${role === "user" ? "user-avatar" : "bot-avatar"}`;
   avatar.setAttribute("aria-hidden", "true");
   avatar.textContent = role === "user" ? "SEN" : era === "2030" ? "N30" : "R98";
-
-  const bubble = document.createElement("div");
-  bubble.className = "bubble";
-
-  const sender = document.createElement("span");
-  sender.className = "sender";
+  const bubble = document.createElement("div"); bubble.className = "bubble";
+  const sender = document.createElement("span"); sender.className = "sender";
   sender.textContent = role === "user" ? "Sen" : era === "2030" ? "NovaChat30" : "RetroChat98";
-
-  const paragraph = document.createElement("p");
-  paragraph.textContent = content;
-
-  const time = document.createElement("time");
-  time.textContent = currentTime();
-
-  bubble.append(sender, paragraph, time);
-  article.append(avatar, bubble);
-  chatLog.append(article);
+  const paragraph = document.createElement("p"); paragraph.textContent = content;
+  const time = document.createElement("time"); time.textContent = label;
+  bubble.append(sender, paragraph, time); article.append(avatar, bubble); chatLog.append(article);
   chatLog.scrollTop = chatLog.scrollHeight;
+  return { article, paragraph };
 }
 
-function setBusy(isBusy) {
-  input.disabled = isBusy;
-  sendButton.disabled = isBusy;
-  typing.hidden = !isBusy;
-  statusText.textContent = isBusy
-    ? era === "2030" ? "Olasılıklar taranıyor..." : "Gemini aranıyor..."
-    : era === "2030" ? "Sistem hazır" : "Hazır";
-}
-
-async function sendMessage(message) {
-  const response = await fetch("/api/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message, history: history.slice(-12), era }),
-  });
-
-  const data = await response.json();
-  if (!response.ok) {
-    throw new Error(data.detail || "Sunucuya ulaşılamadı.");
+function renderSessions() {
+  const list = $("#session-list"); list.replaceChildren();
+  for (const session of sessions) {
+    const button = document.createElement("button"); button.type = "button";
+    button.className = "session-item";
+    if (session.id === activeId) button.setAttribute("aria-current", "true");
+    button.textContent = `${session.era} · ${session.title}`;
+    button.addEventListener("click", () => {
+      if (activeId === session.id) return;
+      cancelActive(); activeId = session.id; era = session.era; render();
+    });
+    const row = document.createElement("li"); row.append(button); list.append(row);
   }
-  return data.reply;
+  $("#delete-chat").disabled = !currentSession()?.messages.length;
 }
 
-form.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const message = input.value.trim();
-  if (!message) return;
-
-  addMessage("user", message);
-  input.value = "";
-  charCount.textContent = "0 / 2000";
-  setBusy(true);
-
-  try {
-    const reply = await sendMessage(message);
-    history.push({ role: "user", content: message });
-    history.push({ role: "assistant", content: reply });
-    addMessage("assistant", reply);
-  } catch (error) {
-    addMessage("assistant", `BAĞLANTI NOTU: ${error.message}`);
-    statusText.textContent = "Bağlantı hatası";
-  } finally {
-    setBusy(false);
-    input.focus();
-  }
-});
-
-function switchEra() {
-  era = era === "1998" ? "2030" : "1998";
+function renderEra() {
   const content = eraContent[era];
-
-  document.body.dataset.era = era;
-  document.title = content.title;
-  eraToggle.setAttribute("aria-pressed", String(era === "2030"));
-  eraAction.textContent = content.action;
-  eraDestination.textContent = content.destination;
-  wordmark.setAttribute("aria-label", content.brandLabel);
-  wordmarkTop.textContent = content.brandTop;
-  wordmarkMain.innerHTML = `CHAT <strong>${content.brandYear}</strong>`;
-  tagline.innerHTML = content.tagline;
-  marqueeTrack.textContent = content.marquee;
-  windowTitle.textContent = content.windowTitle;
-  connection.textContent = content.connection;
-  typingText.textContent = content.typing;
-  messageLabel.textContent = content.label;
-  input.placeholder = content.placeholder;
-  statusZone.textContent = content.zone;
-  footerNote.textContent = content.footer;
-  counter.innerHTML = content.counter;
+  document.body.dataset.era = era; document.title = content.title;
+  $("#era-toggle").setAttribute("aria-pressed", String(era === "2030"));
+  $(".era-action").textContent = content.action; $(".era-destination").textContent = content.destination;
+  $("#wordmark").setAttribute("aria-label", era === "2030" ? "NovaChat 30" : "RetroChat 98");
+  $("#wordmark-top").textContent = content.brand;
+  $("#wordmark-main").innerHTML = `CHAT <strong>${content.year}</strong>`;
+  $("#tagline").innerHTML = content.tagline; $("#marquee-track").textContent = content.marquee;
+  $("#window-title").textContent = content.window; $("#connection b").textContent = content.connection;
+  $("#typing-text").textContent = content.typing; $("#message-label").textContent = content.label;
+  input.placeholder = content.placeholder; $("#status-zone").textContent = content.zone;
+  $("#footer-note").textContent = content.footer; $("#counter").innerHTML = content.counter;
+  $("#era-disclaimer").textContent = content.disclaimer;
   statusText.textContent = era === "2030" ? "Sistem hazır" : "Hazır";
-
-  history.length = 0;
-  chatLog.replaceChildren();
-  addMessage("assistant", content.welcome);
-  input.focus();
 }
 
-eraToggle.addEventListener("click", switchEra);
-
-input.addEventListener("input", () => {
-  charCount.textContent = `${input.value.length} / 2000`;
-});
-
-input.addEventListener("keydown", (event) => {
-  if (event.key === "Enter" && !event.shiftKey) {
-    event.preventDefault();
-    form.requestSubmit();
+function clearError() { chatError.hidden = true; failedIndex = null; }
+function render() {
+  renderEra(); renderSessions(); clearError(); chatLog.replaceChildren();
+  const session = currentSession();
+  if (!session?.messages.length) addMessage("assistant", eraContent[era].welcome, "şimdi");
+  else for (const message of session.messages) addMessage(message.role, message.content, message.time || "önce");
+  if (session?.messages.at(-1)?.role === "user") {
+    failedIndex = session.messages.length - 1;
+    $("#chat-error-text").textContent = "Bu mesaj için yanıt alınmadı.";
+    chatError.hidden = false;
   }
+}
+
+function setBusy(busy, kind = "chat") {
+  input.disabled = busy; $("#send-button").disabled = busy;
+  typing.hidden = !busy || kind !== "chat"; cancelButton.hidden = !busy || kind !== "chat";
+  $("#compare-cancel").hidden = !busy || kind !== "compare";
+  $("#compare-input").disabled = busy; compareForm.querySelector('button[type="submit"]').disabled = busy;
+  statusText.textContent = busy ? kind === "compare" ? "İki dönem yanıtlıyor..." : "Yanıt bekleniyor..." : era === "2030" ? "Sistem hazır" : "Hazır";
+}
+
+function cancelActive() {
+  if (!activeRequest) return;
+  const request = activeRequest; activeRequest = null; request.controller.abort();
+  request.placeholder?.article.remove(); setBusy(false);
+}
+
+function errorMessage(detail, status) {
+  if (status === 429 || detail?.code === "rate_limited") return "Çok fazla istek gönderildi. Bir dakika sonra tekrar dene.";
+  if (detail?.message) return detail.message;
+  if (status === 503) return "Sohbet hizmeti şu an meşgul. Biraz sonra tekrar dene.";
+  return "Bağlantı kurulamadı. İnternet bağlantını kontrol edip tekrar dene.";
+}
+
+async function streamReply(message, history, selectedEra, signal, onChunk) {
+  const response = await fetch("/api/chat/stream", {
+    method: "POST", headers: { "Content-Type": "application/json" }, signal,
+    body: JSON.stringify({ message, history, era: selectedEra })
+  });
+  if (!response.ok) {
+    let detail; try { detail = (await response.json()).detail; } catch { /* use generic error */ }
+    throw new Error(errorMessage(detail, response.status));
+  }
+  if (!response.body) throw new Error("Tarayıcı akış yanıtını açamadı.");
+  const reader = response.body.getReader(), decoder = new TextDecoder();
+  let buffer = "", fullText = "", finished = false;
+  while (!finished) {
+    const { value, done } = await reader.read();
+    buffer += decoder.decode(value || new Uint8Array(), { stream: !done }).replace(/\r\n/g, "\n");
+    let boundary;
+    while ((boundary = buffer.indexOf("\n\n")) !== -1) {
+      const packet = buffer.slice(0, boundary); buffer = buffer.slice(boundary + 2);
+      const name = packet.match(/^event: (.+)$/m)?.[1];
+      const dataLine = packet.match(/^data: (.+)$/m)?.[1];
+      const data = dataLine ? JSON.parse(dataLine) : {};
+      if (name === "chunk") { fullText += data.text || ""; onChunk(fullText); }
+      if (name === "error") throw new Error(errorMessage(data));
+      if (name === "done") { finished = true; break; }
+    }
+    if (done && !finished) throw new Error("Yanıt tamamlanamadı. Tekrar dene.");
+  }
+  await reader.cancel().catch(() => {});
+  return fullText;
+}
+
+async function runChat(message, retryAt = null) {
+  if (activeRequest) return;
+  const session = currentSession(), index = retryAt === null ? session.messages.length : retryAt;
+  const history = session.messages.slice(0, index).slice(-12).map(({ role, content }) => ({ role, content }));
+  if (retryAt === null) {
+    if (index === 0) sendEvent("chat_started");
+    session.messages.push({ role: "user", content: message, time: timeLabel() });
+    session.title = message.length > 30 ? `${message.slice(0, 30)}…` : message;
+    session.updated = Date.now(); persist();
+    if (index === 0) chatLog.replaceChildren();
+    addMessage("user", message); renderSessions();
+  }
+  clearError(); input.value = ""; $("#char-count").textContent = "0 / 2000";
+  const controller = new AbortController();
+  const request = { controller, sessionId: session.id, kind: "chat", placeholder: addMessage("assistant", "") };
+  activeRequest = request; setBusy(true);
+  try {
+    const reply = await streamReply(message, history, era, controller.signal, (text) => {
+      if (activeRequest === request) { request.placeholder.paragraph.textContent = text; chatLog.scrollTop = chatLog.scrollHeight; }
+    });
+    if (activeRequest !== request) return;
+    if (!reply.trim()) throw new Error("Boş yanıt alındı. Tekrar dene.");
+    session.messages.push({ role: "assistant", content: reply, time: timeLabel() });
+    session.updated = Date.now(); persist();
+    announcement.textContent = `${era === "2030" ? "NovaChat30" : "RetroChat98"} yanıtladı: ${reply}`;
+  } catch (error) {
+    if (activeRequest !== request) return;
+    request.placeholder.article.remove(); failedIndex = index;
+    $("#chat-error-text").textContent = error.name === "AbortError" ? "Yanıt durduruldu." : error.message;
+    chatError.hidden = false; statusText.textContent = "Yanıt alınamadı";
+  } finally {
+    if (activeRequest === request) { activeRequest = null; setBusy(false); input.focus(); }
+  }
+}
+
+$("#chat-form").addEventListener("submit", (event) => {
+  event.preventDefault(); const message = input.value.trim(); if (message) runChat(message);
 });
+$("#retry-button").addEventListener("click", () => {
+  if (failedIndex === null) return;
+  const message = currentSession().messages[failedIndex];
+  if (message?.role === "user") { sendEvent("retry"); runChat(message.content, failedIndex); }
+});
+cancelButton.addEventListener("click", () => activeRequest?.controller.abort());
+$("#era-toggle").addEventListener("click", () => {
+  cancelActive();
+  const nextEra = era === "1998" ? "2030" : "1998", existing = sessions.find((item) => item.era === nextEra);
+  if (existing) { activeId = existing.id; era = nextEra; render(); } else newSession(nextEra);
+  announcement.textContent = `${nextEra} dönemine geçildi. ${eraContent[nextEra].disclaimer}`; input.focus();
+});
+$("#new-chat").addEventListener("click", () => { cancelActive(); newSession(); input.focus(); });
+$("#delete-chat").addEventListener("click", () => {
+  cancelActive(); sessions = sessions.filter((item) => item.id !== activeId);
+  const existing = sessions.find((item) => item.era === era);
+  if (existing) { activeId = existing.id; persist(); render(); } else newSession();
+  announcement.textContent = "Sohbet silindi.";
+});
+document.querySelectorAll(".prompt-chip").forEach((button) => button.addEventListener("click", () => {
+  input.value = button.dataset.prompt; $("#char-count").textContent = `${input.value.length} / 2000`; input.focus();
+}));
+input.addEventListener("input", () => { $("#char-count").textContent = `${input.value.length} / 2000`; });
+input.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); $("#chat-form").requestSubmit(); }
+});
+
+$("#compare-toggle").addEventListener("click", () => {
+  comparePanel.hidden = !comparePanel.hidden;
+  $("#compare-toggle").setAttribute("aria-expanded", String(!comparePanel.hidden));
+  if (!comparePanel.hidden) $("#compare-input").focus();
+});
+$("#compare-close").addEventListener("click", () => {
+  if (activeRequest?.kind === "compare") cancelActive();
+  comparePanel.hidden = true; $("#compare-toggle").setAttribute("aria-expanded", "false"); $("#compare-toggle").focus();
+});
+$("#compare-cancel").addEventListener("click", () => activeRequest?.controller.abort());
+const compareForm = $("#compare-form");
+compareForm.addEventListener("submit", async (event) => {
+  event.preventDefault(); const question = $("#compare-input").value.trim();
+  if (!question || activeRequest) return;
+  sendEvent("comparison_started");
+  $("#compare-error").hidden = true; compareResults.hidden = false;
+  $("#compare-1998").textContent = "Yanıt bekleniyor..."; $("#compare-2030").textContent = "Yanıt bekleniyor...";
+  const controller = new AbortController(), request = { controller, kind: "compare" };
+  activeRequest = request; setBusy(true, "compare");
+  try {
+    await Promise.all(["1998", "2030"].map(async (selectedEra) => {
+      const target = $(`#compare-${selectedEra}`);
+      const reply = await streamReply(question, [], selectedEra, controller.signal, (text) => {
+        if (activeRequest === request) target.textContent = text;
+      });
+      if (activeRequest === request) target.textContent = reply;
+    }));
+    if (activeRequest === request) announcement.textContent = "İki dönemin yanıtı hazır.";
+  } catch (error) {
+    if (activeRequest === request) {
+      controller.abort(); $("#compare-error").textContent = error.name === "AbortError" ? "Karşılaştırma durduruldu." : error.message;
+      $("#compare-error").hidden = false;
+    }
+  } finally { if (activeRequest === request) { activeRequest = null; setBusy(false); } }
+});
+
+if (!activeId) newSession(); else render();
+sendEvent("page_view");

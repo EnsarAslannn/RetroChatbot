@@ -1,0 +1,175 @@
+import socket
+import subprocess
+import time
+
+import pytest
+from playwright.sync_api import sync_playwright
+
+
+@pytest.fixture(scope="module")
+def server():
+    process = subprocess.Popen(
+        [".venv/Scripts/python.exe", "-m", "uvicorn", "app.main:app", "--port", "8765"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    for _ in range(50):
+        try:
+            with socket.create_connection(("127.0.0.1", 8765), timeout=0.1):
+                break
+        except OSError:
+            time.sleep(0.1)
+    else:
+        process.terminate()
+        raise RuntimeError("Test sunucusu başlamadı")
+    yield "http://127.0.0.1:8765"
+    process.terminate()
+    process.wait(timeout=5)
+
+
+@pytest.fixture
+def page(server):
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(headless=True)
+        context = browser.new_context()
+        page = context.new_page()
+        yield page
+        page.unroute_all(behavior="ignoreErrors")
+        browser.close()
+
+
+def stream_response(route, text="Yanıt geldi"):
+    route.fulfill(
+        status=200,
+        content_type="text/event-stream",
+        body=f'event: chunk\ndata: {{"text":"{text}"}}\n\nevent: done\ndata: {{}}\n\n',
+    )
+
+
+def test_chat_persists_after_reload_and_new_chat_clears_visible_log(page, server):
+    page.route("**/api/chat/stream", lambda route: stream_response(route))
+    page.goto(server)
+    page.locator("#message-input").fill("İlk soru")
+    page.locator("#send-button").click()
+    page.locator("#chat-log").get_by_text("Yanıt geldi", exact=True).wait_for()
+    page.reload()
+    assert page.locator("#chat-log").get_by_text("İlk soru", exact=True).is_visible()
+    assert page.locator("#chat-log").get_by_text("Yanıt geldi", exact=True).is_visible()
+    page.get_by_role("button", name="Yeni sohbet").click()
+    assert page.locator("#chat-log").get_by_text("İlk soru", exact=True).count() == 0
+
+
+def test_failed_message_can_be_retried_without_retyping(page, server):
+    attempts = []
+
+    def answer(route):
+        attempts.append(route.request.post_data_json["message"])
+        if len(attempts) == 1:
+            route.fulfill(status=503, content_type="application/json", body='{"detail":{"code":"upstream_busy","message":"Meşgul"}}')
+        else:
+            stream_response(route)
+
+    page.route("**/api/chat/stream", answer)
+    page.goto(server)
+    page.locator("#message-input").fill("Tekrar gönder")
+    page.locator("#send-button").click()
+    page.get_by_role("button", name="Tekrar dene").click()
+    page.locator("#chat-log").get_by_text("Yanıt geldi", exact=True).wait_for()
+    assert attempts == ["Tekrar gönder", "Tekrar gönder"]
+    assert page.locator(".user-message").count() == 1
+
+
+def test_compare_asks_both_eras_without_adding_to_chat(page, server):
+    eras = []
+
+    def answer(route):
+        era = route.request.post_data_json["era"]
+        eras.append(era)
+        stream_response(route, f"{era} yanıtı")
+
+    page.route("**/api/chat/stream", answer)
+    page.goto(server)
+    page.get_by_role("button", name="İki dönemi karşılaştır").click()
+    page.locator("#compare-input").fill("İletişim nasıl?")
+    page.get_by_role("button", name="Karşılaştır", exact=True).click()
+    page.locator("#compare-1998").get_by_text("1998 yanıtı", exact=True).wait_for()
+    page.locator("#compare-2030").get_by_text("2030 yanıtı", exact=True).wait_for()
+    assert set(eras) == {"1998", "2030"}
+    assert page.locator(".user-message").count() == 0
+
+
+def test_era_change_discards_old_pending_reply(page, server):
+    pending = []
+    page.route("**/api/chat/stream", lambda route: pending.append(route))
+    page.goto(server)
+    page.locator("#message-input").fill("Eski soru")
+    page.locator("#send-button").click()
+    page.wait_for_function("() => document.querySelector('#cancel-button').hidden === false")
+    page.get_by_role("button", name="Modernleştir").click()
+    assert page.locator("body").get_attribute("data-era") == "2030"
+    assert page.locator("#chat-log").get_by_text("Eski soru", exact=True).count() == 0
+
+
+def test_saved_chat_is_a_keyboard_accessible_button(page, server):
+    page.route("**/api/chat/stream", lambda route: stream_response(route))
+    page.goto(server)
+    page.locator("#message-input").fill("Kaydedilen soru")
+    page.locator("#send-button").click()
+    page.locator("#chat-log").get_by_text("Yanıt geldi", exact=True).wait_for()
+    assert page.get_by_role("button", name="1998 · Kaydedilen soru").is_visible()
+
+
+def test_prompt_fills_composer_and_deleting_chat_removes_saved_message(page, server):
+    page.route("**/api/chat/stream", lambda route: stream_response(route))
+    page.goto(server)
+    page.get_by_role("button", name="İnternete nasıl bağlanılıyor?").click()
+    assert page.locator("#message-input").input_value() == "İnsanlar internete nasıl bağlanıyor?"
+    page.locator("#send-button").click()
+    page.locator("#chat-log").get_by_text("Yanıt geldi", exact=True).wait_for()
+    page.get_by_role("button", name="Bu sohbeti sil").click()
+    page.reload()
+    assert page.locator("#chat-log").get_by_text("İnsanlar internete nasıl bağlanıyor?", exact=True).count() == 0
+
+
+def test_mobile_page_has_no_horizontal_overflow_or_script_error(page, server):
+    errors = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.goto(server)
+    assert page.get_by_role("heading", name="RetroChat 98 — Sohbet Odası").is_visible()
+    assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+    assert not errors
+
+
+def test_product_events_have_names_but_no_chat_text(page, server):
+    events = []
+    page.route("**/api/events", lambda route: (events.append(route.request.post_data_json), route.fulfill(status=204)))
+    page.route("**/api/chat/stream", lambda route: stream_response(route))
+    page.goto(server)
+    page.locator("#message-input").fill("Gizli soru metni")
+    page.locator("#send-button").click()
+    page.locator("#chat-log").get_by_text("Yanıt geldi", exact=True).wait_for()
+    page.wait_for_timeout(100)
+    assert {item["event"] for item in events} >= {"page_view", "chat_started"}
+    assert "Gizli soru metni" not in str(events)
+
+
+def test_unanswered_message_can_be_retried_after_reload(page, server):
+    attempts = []
+
+    def answer(route):
+        attempts.append(route.request.post_data_json["message"])
+        if len(attempts) == 1:
+            route.fulfill(status=503, content_type="application/json", body='{"detail":{"code":"upstream_busy","message":"Meşgul"}}')
+        else:
+            stream_response(route)
+
+    page.route("**/api/chat/stream", answer)
+    page.goto(server)
+    page.locator("#message-input").fill("Yarım kalan soru")
+    page.locator("#send-button").click()
+    page.get_by_role("button", name="Tekrar dene").wait_for()
+    page.reload()
+    page.get_by_role("button", name="Tekrar dene").click()
+    page.locator("#chat-log").get_by_text("Yanıt geldi", exact=True).wait_for()
+    assert attempts == ["Yarım kalan soru", "Yarım kalan soru"]

@@ -35,6 +35,41 @@
         </div>
       </header>
 
+      <section class="intro-panel" aria-labelledby="intro-title">
+        <div>
+          <p class="eyebrow">ZAMAN TÜNELİ / ETKİLEŞİMLİ DENEYİM</p>
+          <h2 id="intro-title">Bir soru, iki farklı zaman.</h2>
+          <p>1998'in internet ruhuyla sohbet et veya aynı sorunun 2030 yorumunu karşılaştır.</p>
+        </div>
+        <button id="compare-toggle" type="button" aria-expanded="false" aria-controls="compare-panel">İki dönemi karşılaştır</button>
+      </section>
+
+      <section id="compare-panel" class="compare-panel" aria-labelledby="compare-title" hidden>
+        <div class="compare-heading">
+          <div><p class="eyebrow">KARŞILAŞTIRMA</p><h2 id="compare-title">Aynı soru, iki bakış</h2></div>
+          <button id="compare-close" type="button" class="small-button" aria-label="Karşılaştırmayı kapat">Kapat</button>
+        </div>
+        <p>2030 yanıtı yaratıcı bir gelecek kurgusudur; doğrulanmış bir öngörü değildir.</p>
+        <form id="compare-form">
+          <label for="compare-input">Karşılaştırmak istediğin soru</label>
+          <div class="compare-input-row"><input id="compare-input" maxlength="2000" required placeholder="Örn. Arkadaşlarımızla nasıl iletişim kuracağız?"><button type="submit">Karşılaştır</button></div>
+        </form>
+        <button id="compare-cancel" type="button" class="small-button" hidden>Karşılaştırmayı durdur</button>
+        <div id="compare-error" class="inline-error" role="alert" hidden></div>
+        <div id="compare-results" class="compare-results" hidden>
+          <article class="era-result"><span>1998 / RETROCHAT</span><p id="compare-1998"></p></article>
+          <article class="era-result"><span>2030 / NOVACHAT · GELECEK KURGUSU</span><p id="compare-2030"></p></article>
+        </div>
+      </section>
+
+      <div class="workspace">
+        <aside class="sessions" aria-labelledby="sessions-title">
+          <div class="sessions-heading"><h2 id="sessions-title">Sohbetlerim</h2><button id="new-chat" type="button" class="small-button">Yeni sohbet</button></div>
+          <p>Bu cihazda saklanır.</p>
+          <ul id="session-list" class="session-list"></ul>
+          <button id="delete-chat" type="button" class="text-button">Bu sohbeti sil</button>
+        </aside>
+
       <section class="chat-window" aria-labelledby="window-title">
         <div class="title-bar">
           <div class="title-copy">
@@ -51,7 +86,16 @@
           <span id="connection" class="connection"><i></i> <b>56K BAĞLI</b></span>
         </div>
 
-        <div id="chat-log" class="chat-log" role="log" aria-live="polite" aria-label="Sohbet mesajları">
+        <div class="chat-guide">
+          <p id="era-disclaimer">1998 dönemi canlandırması. Yanıtları önemli kararlar için doğrula.</p>
+          <div class="prompt-list" aria-label="Örnek sorular">
+            <button type="button" class="prompt-chip" data-prompt="İnsanlar internete nasıl bağlanıyor?">İnternete nasıl bağlanılıyor?</button>
+            <button type="button" class="prompt-chip" data-prompt="Arkadaşlarınla nasıl iletişim kurardın?">İletişim nasıl kurulurdu?</button>
+            <button type="button" class="prompt-chip" data-prompt="Bir günün nasıl geçiyor?">Bir günün nasıl geçiyor?</button>
+          </div>
+        </div>
+
+        <div id="chat-log" class="chat-log" role="log" aria-live="off" aria-label="Sohbet mesajları">
           <article class="message bot-message">
             <div class="avatar bot-avatar" aria-hidden="true">R98</div>
             <div class="bubble">
@@ -66,6 +110,8 @@
           <span class="modem-lights" aria-hidden="true"><i></i><i></i><i></i></span>
           <span id="typing-text">RetroChat98 hatta veri arıyor...</span>
         </div>
+        <div id="chat-error" class="chat-error" role="alert" hidden><span id="chat-error-text"></span><button id="retry-button" type="button" class="small-button">Tekrar dene</button></div>
+        <button id="cancel-button" type="button" class="small-button cancel-button" hidden>Yanıtı durdur</button>
 
         <form id="chat-form" class="composer">
           <label id="message-label" for="message-input">Mesajın:</label>
@@ -84,6 +130,7 @@
           <span id="status-zone" class="status-zone">Internet bölgesi</span>
         </div>
       </section>
+      </div>
 
       <aside class="web-ring" aria-label="Site bilgisi">
         <span>◀ ÖNCEKİ</span>
@@ -96,6 +143,8 @@
         <p id="counter" class="counter">ZİYARETÇİ: <span>0001998</span></p>
       </footer>
     </main>
+
+    <div id="announcement" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
 
     <script src="/static/app.js" defer></script>
   </body>

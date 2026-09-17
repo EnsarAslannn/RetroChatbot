@@ -58,22 +58,7 @@ class GeminiChatService:
         )
 
     def reply(self, message, history, era: str = "1998"):
-        contents = [
-            types.Content(
-                role="model" if item.role == "assistant" else "user",
-                parts=[types.Part(text=item.content)],
-            )
-            for item in history
-        ]
-        contents.append(
-            types.Content(role="user", parts=[types.Part(text=message)])
-        )
-
-        config = types.GenerateContentConfig(
-            system_instruction=SYSTEM_INSTRUCTIONS[era],
-            temperature=0.9,
-            max_output_tokens=700,
-        )
+        contents, config = self._request_parts(message, history, era)
         try:
             response = self.client.models.generate_content(
                 model=self.model,
@@ -93,3 +78,46 @@ class GeminiChatService:
             raise RuntimeError("Gemini boş yanıt döndürdü.")
 
         return response.text.strip()
+
+    def stream_reply(self, message, history, era: str = "1998"):
+        contents, config = self._request_parts(message, history, era)
+        emitted = False
+        try:
+            stream = self.client.models.generate_content_stream(
+                model=self.model, contents=contents, config=config
+            )
+            for part in stream:
+                if part.text:
+                    emitted = True
+                    yield part.text
+        except Exception as exc:
+            if emitted or getattr(exc, "code", None) != 503 or self.fallback_model == self.model:
+                raise
+            stream = self.client.models.generate_content_stream(
+                model=self.fallback_model, contents=contents, config=config
+            )
+            for part in stream:
+                if part.text:
+                    emitted = True
+                    yield part.text
+        if not emitted:
+            raise RuntimeError("Gemini boş yanıt döndürdü.")
+
+    def _request_parts(self, message, history, era):
+        contents = [
+            types.Content(
+                role="model" if item.role == "assistant" else "user",
+                parts=[types.Part(text=item.content)],
+            )
+            for item in history
+        ]
+        contents.append(
+            types.Content(role="user", parts=[types.Part(text=message)])
+        )
+
+        config = types.GenerateContentConfig(
+            system_instruction=SYSTEM_INSTRUCTIONS[era],
+            temperature=0.9,
+            max_output_tokens=700,
+        )
+        return contents, config

@@ -11,6 +11,10 @@ class FakeModels:
     def generate_content(self, **kwargs):
         return TextResponse()
 
+    def generate_content_stream(self, **kwargs):
+        yield type("Part", (), {"text": "Parça "})()
+        yield type("Part", (), {"text": "iki"})()
+
 
 class FakeClient:
     models = FakeModels()
@@ -89,3 +93,8 @@ def test_service_adopts_the_requested_2030_persona():
     result = service.reply("Hangi yıldayız?", [], era="2030")
 
     assert result == "2030 kanalından bağlandım."
+
+
+def test_service_streams_only_nonempty_text():
+    service = GeminiChatService(api_key="test-key", client=FakeClient())
+    assert list(service.stream_reply("Merhaba", [], era="1998")) == ["Parça ", "iki"]
