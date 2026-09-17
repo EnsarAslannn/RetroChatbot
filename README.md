@@ -52,7 +52,7 @@ flowchart LR
 
 `/api/chat/stream` Server-Sent Events biçiminde `chunk`, `done` ve `error` olayları döndürür. Karşılaştırma iki ayrı istek gönderir; sohbet geçmişini değiştirmez. `/api/chat` önceki JSON sözleşmesi için korunmuştur. `GET /api/health` temel canlılık kontrolüdür.
 
-Hata yanıtlarında `detail.code` ve `detail.message` alanları bulunur. Kodlar: `not_configured`, `rate_limited`, `upstream_busy`, `upstream_timeout`, `upstream_error`. Akış başladıktan sonraki hatalar HTTP gövdesinde `event: error` olarak iletilir.
+Hata yanıtlarında `detail.code` ve `detail.message` alanları bulunur. Kodlar: `not_configured`, `invalid_api_key`, `upstream_forbidden`, `upstream_unreachable`, `rate_limited`, `upstream_busy`, `upstream_timeout`, `upstream_error`. Akış başladıktan sonraki hatalar HTTP gövdesinde `event: error` olarak iletilir.
 
 `POST /api/events` yalnızca `page_view`, `chat_started`, `retry` veya `comparison_started` olay adını kabul eder; mesaj içeriğini reddeder. `GET /api/metrics` bu sayaçları, toplam kabul edilen sohbet isteklerini, başarıyı, hatayı, zaman aşımını, ortalama yanıt süresini ve sayfa görüntülemesi başına sohbet başlatma ile istek başına tekrar deneme oranlarını döndürür. Bir sayfa görüntülemesinde birden fazla yeni sohbet açılabildiği için ilk oran 1'i aşabilir. Ölçümler yalnızca bellektedir; süreç yeniden başlayınca sıfırlanır. Soru ve yanıt metinleri ölçümlere veya uygulama loglarına yazılmaz. İstek sınırına takılan çağrılar kabul edilen sohbet isteği sayısına dahil değildir.
 

@@ -98,6 +98,24 @@ def test_compare_asks_both_eras_without_adding_to_chat(page, server):
     assert page.locator(".user-message").count() == 0
 
 
+def test_compare_error_clears_waiting_labels(page, server):
+    page.route(
+        "**/api/chat/stream",
+        lambda route: route.fulfill(
+            status=503,
+            content_type="application/json",
+            body='{"detail":{"code":"invalid_api_key","message":"API anahtarı geçersiz"}}',
+        ),
+    )
+    page.goto(server)
+    page.locator("#compare-toggle").click()
+    page.locator("#compare-input").fill("İletişim nasıl?")
+    page.locator('#compare-form button[type="submit"]').click()
+    page.locator("#compare-error").wait_for(state="visible")
+    assert "Yanıt bekleniyor..." not in page.locator("#compare-1998").text_content()
+    assert "Yanıt bekleniyor..." not in page.locator("#compare-2030").text_content()
+
+
 def test_era_change_discards_old_pending_reply(page, server):
     pending = []
     page.route("**/api/chat/stream", lambda route: pending.append(route))

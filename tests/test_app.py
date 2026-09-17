@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+from httpx import ConnectError
 import time
 
 from app.main import app, get_chat_service, SlidingWindowLimiter
@@ -37,6 +38,29 @@ class BrokenStreamingService:
     def stream_reply(self, message, history, era="1998"):
         error = RuntimeError("Model dolu")
         error.code = 503
+        raise error
+        yield ""
+
+
+class DisconnectedStreamingService:
+    def stream_reply(self, message, history, era="1998"):
+        raise ConnectError("connection failed")
+        yield ""
+
+
+class RejectedKeyStreamingService:
+    def stream_reply(self, message, history, era="1998"):
+        error = RuntimeError("Gemini rejected the credential")
+        error.code = 400
+        error.message = "API key not valid. Please pass a valid API key."
+        raise error
+        yield ""
+
+
+class RestrictedKeyStreamingService:
+    def stream_reply(self, message, history, era="1998"):
+        error = RuntimeError("permission denied")
+        error.code = 403
         raise error
         yield ""
 
@@ -180,6 +204,44 @@ def test_stream_reports_upstream_error_as_event():
     assert response.status_code == 200
     assert 'event: error' in response.text
     assert '"code":"upstream_busy"' in response.text
+
+
+def test_stream_explains_and_logs_provider_connection_failures(caplog):
+    app.dependency_overrides[get_chat_service] = lambda: DisconnectedStreamingService()
+    try:
+        with TestClient(app) as client:
+            response = client.post("/api/chat/stream", json={"message": "Merhaba"})
+    finally:
+        app.dependency_overrides.clear()
+    assert response.status_code == 200
+    assert '"code":"upstream_unreachable"' in response.text
+    assert "Model hizmetine bağlanılamıyor" in response.text
+    assert "chat upstream failure type=ConnectError" in caplog.text
+
+
+def test_stream_identifies_rejected_api_key_without_exposing_it():
+    app.dependency_overrides[get_chat_service] = lambda: RejectedKeyStreamingService()
+    try:
+        with TestClient(app) as client:
+            response = client.post("/api/chat/stream", json={"message": "Merhaba"})
+    finally:
+        app.dependency_overrides.clear()
+    assert response.status_code == 200
+    assert '"code":"invalid_api_key"' in response.text
+    assert "API anahtarı geçersiz" in response.text
+    assert "Please pass a valid API key" not in response.text
+
+
+def test_stream_explains_provider_permission_denial():
+    app.dependency_overrides[get_chat_service] = lambda: RestrictedKeyStreamingService()
+    try:
+        with TestClient(app) as client:
+            response = client.post("/api/chat/stream", json={"message": "Merhaba"})
+    finally:
+        app.dependency_overrides.clear()
+    assert response.status_code == 200
+    assert '"code":"upstream_forbidden"' in response.text
+    assert "erişimi reddedildi" in response.text
 
 
 def test_missing_api_key_uses_structured_error(monkeypatch):

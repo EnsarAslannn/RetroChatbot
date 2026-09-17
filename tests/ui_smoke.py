@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
@@ -19,12 +20,12 @@ def verify_page(page, screenshot_name):
         )
         route.fulfill(
             status=200,
-            content_type="application/json",
-            body=f'{{"reply":"{reply}"}}',
+            content_type="text/event-stream",
+            body=f"event: chunk\ndata: {json.dumps({'text': reply}, ensure_ascii=False)}\n\nevent: done\ndata: {{}}\n\n",
         )
 
     page.route(
-        "**/api/chat",
+        "**/api/chat/stream",
         answer_chat,
     )
     page.goto("http://127.0.0.1:8000")
@@ -39,8 +40,8 @@ def verify_page(page, screenshot_name):
 
     page.locator("#message-input").fill("İnternetin geleceği nasıl?")
     page.get_by_role("button", name="GÖNDER").click()
-    page.get_by_text("2030 bağlantısı aktif. Geleceğe hoş geldin.").wait_for()
-    assert page.locator(".message").count() == 3
+    page.locator("#chat-log").get_by_text("2030 bağlantısı aktif. Geleceğe hoş geldin.", exact=True).wait_for()
+    assert page.locator(".message").count() == 2
     assert not console_errors
 
     page.wait_for_timeout(800)

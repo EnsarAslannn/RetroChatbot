@@ -275,6 +275,10 @@ compareForm.addEventListener("submit", async (event) => {
     if (activeRequest === request) {
       controller.abort(); $("#compare-error").textContent = error.name === "AbortError" ? "Karşılaştırma durduruldu." : error.message;
       $("#compare-error").hidden = false;
+      for (const selectedEra of ["1998", "2030"]) {
+        const target = $(`#compare-${selectedEra}`);
+        if (target.textContent === "Yanıt bekleniyor...") target.textContent = error.name === "AbortError" ? "Karşılaştırma durduruldu." : "Yanıt alınamadı.";
+      }
     }
   } finally { if (activeRequest === request) { activeRequest = null; setBusy(false); } }
 });

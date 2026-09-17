@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from httpx import ConnectError, ConnectTimeout
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.gemini_service import GeminiChatService, MissingApiKeyError
@@ -85,9 +86,20 @@ def timeout_seconds() -> float:
 def service_error(exc: Exception) -> HTTPException:
     if isinstance(exc, MissingApiKeyError):
         return HTTPException(503, detail={"code": "not_configured", "message": str(exc)})
+    provider_message = str(getattr(exc, "message", "")).lower()
+    if getattr(exc, "code", None) == 400 and ("api key not valid" in provider_message or "api_key_invalid" in provider_message):
+        return HTTPException(502, detail={"code": "invalid_api_key", "message": "Sunucudaki Gemini API anahtarı geçersiz. Anahtarı ve erişim kısıtlarını kontrol edin."})
+    if getattr(exc, "code", None) in (401, 403):
+        return HTTPException(502, detail={"code": "upstream_forbidden", "message": "Gemini erişimi reddedildi. Sunucudaki API anahtarını ve erişim kısıtlarını kontrol edin."})
     if getattr(exc, "code", None) == 503:
         return HTTPException(503, detail={"code": "upstream_busy", "message": "Gemini hatları şu an meşgul. Birkaç saniye sonra tekrar dene."})
+    if isinstance(exc, (ConnectError, ConnectTimeout)):
+        return HTTPException(503, detail={"code": "upstream_unreachable", "message": "Model hizmetine bağlanılamıyor. Sunucunun internet bağlantısını kontrol edip tekrar dene."})
     return HTTPException(502, detail={"code": "upstream_error", "message": "Sohbet hizmetine bağlanılamadı. Tekrar dene."})
+
+
+def log_service_failure(exc: Exception) -> None:
+    logger.error("chat upstream failure type=%s code=%s", type(exc).__name__, getattr(exc, "code", None))
 
 
 class HistoryItem(BaseModel):
@@ -178,6 +190,7 @@ async def chat(
         raise HTTPException(504, detail={"code": "upstream_timeout", "message": "Yanıt süresi doldu. Tekrar dene."}) from exc
     except Exception as exc:
         record("error", started)
+        log_service_failure(exc)
         raise service_error(exc) from exc
 
 
@@ -227,6 +240,7 @@ def stream_chat(
                     break
                 else:
                     record("error", started)
+                    log_service_failure(value)
                     error = service_error(value)
                     yield event("error", error.detail)
                     break
