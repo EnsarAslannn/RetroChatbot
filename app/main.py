@@ -5,6 +5,7 @@ import logging
 import queue
 import threading
 import time
+import traceback
 from collections import Counter, defaultdict, deque
 from pathlib import Path
 from typing import Annotated, Literal
@@ -96,6 +97,9 @@ def service_error(exc: Exception) -> HTTPException:
     if isinstance(exc, (ConnectError, ConnectTimeout)):
         return HTTPException(503, detail={"code": "upstream_unreachable", "message": "Model hizmetine bağlanılamıyor. Sunucunun internet bağlantısını kontrol edip tekrar dene."})
     detail = {"code": "upstream_error", "message": "Sohbet hizmetine bağlanılamadı. Tekrar dene.", "error_type": type(exc).__name__}
+    if exc.__traceback__:
+        origin = traceback.extract_tb(exc.__traceback__)[-1]
+        detail["error_origin"] = f"{Path(origin.filename).name}:{origin.name}:{origin.lineno}"
     provider_code = getattr(exc, "code", None)
     if isinstance(provider_code, int) and 400 <= provider_code <= 599:
         detail["provider_code"] = provider_code

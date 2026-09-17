@@ -73,6 +73,12 @@ class UnclassifiedStreamingService:
         yield ""
 
 
+class UnclassifiedValueErrorStreamingService:
+    def stream_reply(self, message, history, era="1998"):
+        raise ValueError("private-provider-detail")
+        yield ""
+
+
 def test_health_endpoint_reports_ready():
     with TestClient(app) as client:
         response = client.get("/api/health")
@@ -264,6 +270,18 @@ def test_stream_generic_error_exposes_only_safe_diagnostic_fields():
     assert '"provider_code":429' in response.text
     assert '"error_type":"RuntimeError"' in response.text
     assert "secret-provider-detail" not in response.text
+
+
+def test_stream_value_error_reports_safe_failure_origin():
+    app.dependency_overrides[get_chat_service] = lambda: UnclassifiedValueErrorStreamingService()
+    try:
+        with TestClient(app) as client:
+            response = client.post("/api/chat/stream", json={"message": "Merhaba"})
+    finally:
+        app.dependency_overrides.clear()
+    assert '"error_type":"ValueError"' in response.text
+    assert '"error_origin":"test_app.py:stream_reply:' in response.text
+    assert "private-provider-detail" not in response.text
 
 
 def test_missing_api_key_uses_structured_error(monkeypatch):
