@@ -52,10 +52,10 @@ class GeminiChatService:
             raise MissingApiKeyError("GEMINI_API_KEY ayarlanmamış.")
 
         self.client = client or genai.Client(api_key=api_key)
-        self.model = model or os.getenv("GEMINI_MODEL", "gemini-flash-latest")
-        self.fallback_model = fallback_model or os.getenv(
-            "GEMINI_FALLBACK_MODEL", "gemini-3.6-flash"
-        )
+        self.model = (model or os.getenv("GEMINI_MODEL", "")).strip() or "gemini-flash-latest"
+        self.fallback_model = (
+            fallback_model or os.getenv("GEMINI_FALLBACK_MODEL", "")
+        ).strip() or "gemini-3.6-flash"
 
     def reply(self, message, history, era: str = "1998"):
         contents, config = self._request_parts(message, history, era)

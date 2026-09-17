@@ -98,3 +98,14 @@ def test_service_adopts_the_requested_2030_persona():
 def test_service_streams_only_nonempty_text():
     service = GeminiChatService(api_key="test-key", client=FakeClient())
     assert list(service.stream_reply("Merhaba", [], era="1998")) == ["Parça ", "iki"]
+
+
+@pytest.mark.parametrize("blank", ["", "   "])
+def test_blank_model_environment_uses_working_defaults(monkeypatch, blank):
+    monkeypatch.setenv("GEMINI_MODEL", blank)
+    monkeypatch.setenv("GEMINI_FALLBACK_MODEL", blank)
+    service = GeminiChatService(api_key="test-key", client=FakeClient())
+
+    assert service.model == "gemini-flash-latest"
+    assert service.fallback_model == "gemini-3.6-flash"
+    assert list(service.stream_reply("Merhaba", [], era="1998")) == ["Parça ", "iki"]
