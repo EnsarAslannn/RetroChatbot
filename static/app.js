@@ -93,7 +93,7 @@ function newSession(selectedEra = era) {
   persist(); render(); return session;
 }
 
-function addMessage(role, content, label = timeLabel()) {
+function addMessage(role, content, label = timeLabel(), savedMessage = null) {
   const article = document.createElement("article");
   article.className = `message ${role === "user" ? "user-message" : "bot-message"}`;
   const avatar = document.createElement("div");
@@ -107,8 +107,31 @@ function addMessage(role, content, label = timeLabel()) {
   const time = document.createElement("time"); time.textContent = label;
   bubble.append(sender, paragraph, time); article.append(avatar, bubble); chatLog.append(article);
   if (role === "assistant") splitLongAnswer(paragraph, content);
+  if (role === "assistant" && savedMessage) renderFeedback(bubble, savedMessage);
   chatLog.scrollTop = chatLog.scrollHeight;
   return { article, paragraph };
+}
+
+function renderFeedback(bubble, message) {
+  let controls = bubble.querySelector(".answer-feedback");
+  if (!controls) { controls = document.createElement("div"); controls.className = "answer-feedback"; bubble.append(controls); }
+  controls.replaceChildren();
+  const options = { period_fit: "Döneme uygun", incomplete: "Yarım kaldı", repetitive: "Tekrar ediyor" };
+  if (message.feedback && options[message.feedback]) {
+    const note = document.createElement("span"); note.textContent = `Geri bildirim alındı: ${options[message.feedback]}`;
+    controls.append(note); return;
+  }
+  controls.setAttribute("role", "group"); controls.setAttribute("aria-label", "Yanıt geri bildirimi");
+  for (const [key, label] of Object.entries(options)) {
+    const button = document.createElement("button"); button.type = "button"; button.className = "feedback-button";
+    button.textContent = label;
+    button.addEventListener("click", () => {
+      message.feedback = key; persist(); sendEvent(`feedback_${key}`);
+      renderFeedback(bubble, message);
+      announcement.textContent = `Geri bildirim alındı: ${label}`;
+    });
+    controls.append(button);
+  }
 }
 
 function splitLongAnswer(paragraph, content) {
@@ -174,7 +197,7 @@ function render() {
   const session = currentSession();
   if (session?.legacyMessageCount) $("#era-disclaimer").textContent += " Önceki 2030 sohbeti arşivlendi; yeni yanıtlar 2058 döneminden gelir.";
   if (!session?.messages.length) addMessage("assistant", eraContent[era].welcome, "şimdi");
-  else for (const message of session.messages) addMessage(message.role, message.content, message.time || "önce");
+  else for (const message of session.messages) addMessage(message.role, message.content, message.time || "önce", message);
   if (session?.messages.at(-1)?.role === "user") {
     failedIndex = session.messages.length - 1;
     $("#chat-error-text").textContent = "Bu mesaj için yanıt alınmadı.";
@@ -258,9 +281,11 @@ async function runChat(message, retryAt = null) {
     });
     if (activeRequest !== request) return;
     if (!reply.trim()) throw new Error("Boş yanıt alındı. Tekrar dene.");
-    session.messages.push({ role: "assistant", content: reply, time: timeLabel() });
+    const replyMessage = { role: "assistant", content: reply, time: timeLabel() };
+    session.messages.push(replyMessage);
     session.updated = Date.now(); persist();
     splitLongAnswer(request.placeholder.paragraph, reply);
+    renderFeedback(request.placeholder.article.querySelector(".bubble"), replyMessage);
     announcement.textContent = `${era === "2058" ? "FutureChat2058" : "RetroChat98"} yanıtı tamamlandı.`;
   } catch (error) {
     if (activeRequest !== request) return;

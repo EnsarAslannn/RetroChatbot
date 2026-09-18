@@ -223,6 +223,24 @@ def test_reading_preferences_persist_and_split_long_answer(page, server):
     assert page.locator(".bot-message .answer-part").count() > 1
 
 
+def test_answer_feedback_is_saved_and_sends_only_selected_reason(page, server):
+    events = []
+    page.route("**/api/events", lambda route: (events.append(route.request.post_data_json), route.fulfill(status=204)))
+    page.route("**/api/chat/stream", lambda route: stream_response(route, "Özel yanıt metni"))
+    page.goto(server)
+    page.locator("#message-input").fill("Özel soru metni")
+    page.locator("#send-button").click()
+    page.locator("#chat-log").get_by_text("Özel yanıt metni", exact=True).wait_for()
+    assert page.get_by_role("button", name="Yarım kaldı").is_visible()
+    page.get_by_role("button", name="Yarım kaldı").click()
+    assert page.locator("#chat-log").get_by_text("Geri bildirim alındı: Yarım kaldı").is_visible()
+    page.reload()
+    assert page.locator("#chat-log").get_by_text("Geri bildirim alındı: Yarım kaldı").is_visible()
+    assert [event for event in events if event["event"] == "feedback_incomplete"] == [{"event": "feedback_incomplete"}]
+    assert "Özel soru metni" not in str(events)
+    assert "Özel yanıt metni" not in str(events)
+
+
 def test_compare_error_clears_waiting_labels(page, server):
     page.route(
         "**/api/chat/stream",

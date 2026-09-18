@@ -301,3 +301,14 @@ def test_product_events_count_without_accepting_message_content():
     assert response.status_code == 204
     assert after == before + 1
     assert unsafe.status_code == 422
+
+
+def test_feedback_event_counts_without_accepting_chat_text():
+    with TestClient(app) as client:
+        before = client.get("/api/metrics").json()["feedback_incomplete"]
+        response = client.post("/api/events", json={"event": "feedback_incomplete"})
+        after = client.get("/api/metrics").json()["feedback_incomplete"]
+        unsafe = client.post("/api/events", json={"event": "feedback_incomplete", "message": "özel soru"})
+    assert response.status_code == 204
+    assert after == before + 1
+    assert unsafe.status_code == 422

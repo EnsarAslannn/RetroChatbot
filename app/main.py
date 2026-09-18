@@ -135,7 +135,7 @@ class ChatResponse(BaseModel):
 
 class ProductEvent(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    event: Literal["page_view", "chat_started", "retry", "comparison_started"]
+    event: Literal["page_view", "chat_started", "retry", "comparison_started", "feedback_period_fit", "feedback_incomplete", "feedback_repetitive"]
 
 
 def get_chat_service(request: ChatRequest) -> GeminiChatService:
@@ -169,6 +169,9 @@ def public_metrics() -> dict[str, int | float]:
             "chat_starts": metrics["chat_started"],
             "retries": metrics["retry"],
             "comparisons": metrics["comparison_started"],
+            "feedback_period_fit": metrics["feedback_period_fit"],
+            "feedback_incomplete": metrics["feedback_incomplete"],
+            "feedback_repetitive": metrics["feedback_repetitive"],
             "chat_start_rate": round(metrics["chat_started"] / metrics["page_view"], 3) if metrics["page_view"] else 0,
             "retry_rate": round(metrics["retry"] / requests, 3) if requests else 0,
         }
