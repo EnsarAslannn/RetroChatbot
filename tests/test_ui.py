@@ -200,6 +200,29 @@ def test_saved_chats_are_searchable_by_message_and_exportable(page, server):
     assert "Gelecekte ulaşım?" in text
 
 
+def test_reading_preferences_persist_and_split_long_answer(page, server):
+    long_answer = "Bu bir deneme cümlesidir. " * 55
+    page.route("**/api/chat/stream", lambda route: stream_response(route, long_answer))
+    page.goto(server)
+    assert page.get_by_label("Yazı boyutu").is_visible()
+    page.get_by_label("Yazı boyutu").select_option("large")
+    page.get_by_label("Hareket").select_option("reduced")
+    page.get_by_label("Uzun yanıtları bölümle").check()
+    page.locator("#message-input").fill("Uzun anlat")
+    page.locator("#send-button").click()
+    page.locator(".bot-message .answer-part").nth(1).wait_for()
+    assert page.locator("body").get_attribute("data-text-size") == "large"
+    assert page.locator("body").get_attribute("data-motion") == "reduced"
+    assert page.locator(".bot-message .answer-part").first.evaluate("element => getComputedStyle(element).fontSize") == "18px"
+    assert page.locator("#marquee-track").evaluate("element => getComputedStyle(element).animationName") == "none"
+    assert page.locator("#announcement").text_content() == "RetroChat98 yanıtı tamamlandı."
+    page.reload()
+    assert page.get_by_label("Yazı boyutu").input_value() == "large"
+    assert page.get_by_label("Hareket").input_value() == "reduced"
+    assert page.get_by_label("Uzun yanıtları bölümle").is_checked()
+    assert page.locator(".bot-message .answer-part").count() > 1
+
+
 def test_compare_error_clears_waiting_labels(page, server):
     page.route(
         "**/api/chat/stream",

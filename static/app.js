@@ -4,6 +4,30 @@ const typing = $("#typing"), cancelButton = $("#cancel-button"), announcement = 
 const chatError = $("#chat-error"), comparePanel = $("#compare-panel"), compareResults = $("#compare-results");
 let completedComparison = null;
 const storageKey = "retrochat-sessions-v1";
+const preferencesKey = "retrochat-reading-v1";
+function readPreferences() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(preferencesKey) || "{}");
+    return {
+      textSize: ["normal", "large", "larger"].includes(saved.textSize) ? saved.textSize : "normal",
+      motion: ["system", "reduced"].includes(saved.motion) ? saved.motion : "system",
+      splitAnswers: saved.splitAnswers === true
+    };
+  } catch { return { textSize: "normal", motion: "system", splitAnswers: false }; }
+}
+let preferences = readPreferences();
+function applyPreferences() {
+  document.body.dataset.textSize = preferences.textSize;
+  document.body.dataset.motion = preferences.motion;
+  $("#text-size").value = preferences.textSize;
+  $("#motion-setting").value = preferences.motion;
+  $("#split-answers").checked = preferences.splitAnswers;
+}
+function savePreferences() {
+  try { localStorage.setItem(preferencesKey, JSON.stringify(preferences)); }
+  catch { statusText.textContent = "Okuma ayarları kaydedilemedi"; }
+  applyPreferences();
+}
 
 function sendEvent(event) {
   fetch("/api/events", {
@@ -82,8 +106,27 @@ function addMessage(role, content, label = timeLabel()) {
   const paragraph = document.createElement("p"); paragraph.textContent = content;
   const time = document.createElement("time"); time.textContent = label;
   bubble.append(sender, paragraph, time); article.append(avatar, bubble); chatLog.append(article);
+  if (role === "assistant") splitLongAnswer(paragraph, content);
   chatLog.scrollTop = chatLog.scrollHeight;
   return { article, paragraph };
+}
+
+function splitLongAnswer(paragraph, content) {
+  if (!preferences.splitAnswers || content.length < 600) return;
+  const chunks = [], words = content.trim().split(/\s+/);
+  let part = "";
+  for (const word of words) {
+    if (part && `${part} ${word}`.length > 420) { chunks.push(part); part = word; }
+    else part = part ? `${part} ${word}` : word;
+  }
+  if (part) chunks.push(part);
+  if (chunks.length < 2) return;
+  paragraph.textContent = chunks[0]; paragraph.classList.add("answer-part");
+  for (const chunk of chunks.slice(1)) {
+    const next = document.createElement("p"); next.className = "answer-part"; next.textContent = chunk;
+    paragraph.parentNode.insertBefore(next, paragraph.nextSibling);
+    paragraph = next;
+  }
 }
 
 function renderSessions() {
@@ -217,7 +260,8 @@ async function runChat(message, retryAt = null) {
     if (!reply.trim()) throw new Error("Boş yanıt alındı. Tekrar dene.");
     session.messages.push({ role: "assistant", content: reply, time: timeLabel() });
     session.updated = Date.now(); persist();
-    announcement.textContent = `${era === "2058" ? "FutureChat2058" : "RetroChat98"} yanıtladı: ${reply}`;
+    splitLongAnswer(request.placeholder.paragraph, reply);
+    announcement.textContent = `${era === "2058" ? "FutureChat2058" : "RetroChat98"} yanıtı tamamlandı.`;
   } catch (error) {
     if (activeRequest !== request) return;
     request.placeholder.article.remove(); failedIndex = index;
@@ -245,6 +289,16 @@ $("#era-toggle").addEventListener("click", () => {
 });
 $("#new-chat").addEventListener("click", () => { cancelActive(); newSession(); input.focus(); });
 $("#session-search").addEventListener("input", renderSessions);
+$("#text-size").addEventListener("change", (event) => {
+  preferences.textSize = event.target.value; savePreferences();
+});
+$("#motion-setting").addEventListener("change", (event) => {
+  preferences.motion = event.target.value; savePreferences();
+});
+$("#split-answers").addEventListener("change", (event) => {
+  preferences.splitAnswers = event.target.checked; savePreferences();
+  if (!activeRequest) render();
+});
 $("#delete-chat").addEventListener("click", () => {
   cancelActive(); sessions = sessions.filter((item) => item.id !== activeId);
   const existing = sessions.find((item) => item.era === era);
@@ -397,5 +451,6 @@ compareForm.addEventListener("submit", async (event) => {
   } finally { if (activeRequest === request) { activeRequest = null; setBusy(false); } }
 });
 
+applyPreferences();
 if (!activeId) newSession(); else render();
 sendEvent("page_view");

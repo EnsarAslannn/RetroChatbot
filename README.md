@@ -24,6 +24,7 @@ Demo medyası `scripts/capture_demo.py` ile örnek yanıtlar kullanılarak üret
 - Kayıtlı sohbetleri başlık veya mesaj içeriğinde arama; tüm sohbetleri JSON ya da metin dosyası olarak indirme.
 - Önceki 2030 sohbetleri arşiv etiketiyle korunur; yeni 2058 yanıtlarına eski dönem konuşması bağlam olarak gönderilmez.
 - Örnek sorular, mobil düzen, klavye kullanımı, ekran okuyucu duyuruları ve azaltılmış hareket desteği.
+- Bu cihazda saklanan okuma tercihleri: yazı boyutu, hareketi azaltma ve uzun yanıtları okunabilir parçalara ayırma.
 - Sunucuda istek sınırı, zaman aşımı, kodlu hatalar ve mesaj içeriği toplamayan ölçümler.
 - Model token sınırına ulaşırsa yanıtı devam ettirme; tamamlanamayan yanıtı bitmiş gibi kaydetmeme.
 
