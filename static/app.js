@@ -266,6 +266,58 @@ document.querySelectorAll(".topic-chip").forEach((button) => button.addEventList
   $("#compare-input").value = button.dataset.question;
   $("#compare-input").focus();
 }));
+function comparisonText() {
+  if (!completedComparison) return "";
+  const { question, retro, future } = completedComparison;
+  return `RetroChat 98 / FutureChat 2058\nSoru: ${question}\n\n1998 / RETROCHAT\n${retro}\n\n2058 / FUTURECHAT (gelecek kurgusu)\n${future}\n\n2058 yanıtı yaratıcı bir gelecek kurgusudur; doğrulanmış bir öngörü değildir.`;
+}
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob), link = document.createElement("a");
+  link.href = url; link.download = filename; document.body.append(link); link.click(); link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+async function copyComparison() {
+  try { await navigator.clipboard.writeText(comparisonText()); $("#share-status").textContent = "Karşılaştırma kopyalandı."; }
+  catch { $("#share-status").textContent = "Kopyalanamadı. Metin indir seçeneğini kullan."; }
+}
+$("#share-comparison").addEventListener("click", async () => {
+  if (!completedComparison) return;
+  if (!navigator.share) { await copyComparison(); return; }
+  try {
+    await navigator.share({ title: "RetroChat karşılaştırması", text: comparisonText() });
+    $("#share-status").textContent = "Paylaşım açıldı.";
+  } catch (error) {
+    if (error.name !== "AbortError") await copyComparison();
+  }
+});
+$("#copy-comparison").addEventListener("click", () => { if (completedComparison) copyComparison(); });
+$("#download-text").addEventListener("click", () => {
+  if (completedComparison) downloadBlob(new Blob([comparisonText()], { type: "text/plain;charset=utf-8" }), "retrochat-karsilastirma.txt");
+});
+$("#download-image").addEventListener("click", () => {
+  if (!completedComparison) return;
+  const canvas = document.createElement("canvas"), context = canvas.getContext("2d");
+  const width = 1080, inset = 64, maxWidth = width - inset * 2;
+  context.font = "24px Arial";
+  const lines = [];
+  for (const paragraph of comparisonText().split("\n")) {
+    let line = "";
+    for (const word of paragraph.split(/\s+/)) {
+      const next = line ? `${line} ${word}` : word;
+      if (context.measureText(next).width > maxWidth && line) { lines.push(line); line = word; }
+      else line = next;
+    }
+    lines.push(line);
+  }
+  canvas.width = width; canvas.height = Math.max(480, inset * 2 + lines.length * 38);
+  context.fillStyle = "#101525"; context.fillRect(0, 0, canvas.width, canvas.height);
+  context.font = "24px Arial"; context.fillStyle = "#f2f7ff";
+  lines.forEach((line, index) => context.fillText(line, inset, inset + 26 + index * 38));
+  canvas.toBlob((blob) => {
+    if (blob) downloadBlob(blob, "retrochat-karsilastirma.png");
+    else $("#share-status").textContent = "Görsel oluşturulamadı.";
+  }, "image/png");
+});
 $("#capsule-open").addEventListener("click", async () => {
   if (!completedComparison || activeRequest) return;
   const { question, retro, future } = completedComparison;
@@ -296,7 +348,8 @@ compareForm.addEventListener("submit", async (event) => {
   event.preventDefault(); const question = $("#compare-input").value.trim();
   if (!question || activeRequest) return;
   sendEvent("comparison_started");
-  completedComparison = null; $("#capsule-panel").hidden = true; $("#capsule-result").hidden = true;
+  completedComparison = null; $("#share-actions").hidden = true; $("#share-status").textContent = "";
+  $("#capsule-panel").hidden = true; $("#capsule-result").hidden = true;
   $("#compare-error").hidden = true; compareResults.hidden = false;
   $("#compare-1998").textContent = "Yanıt bekleniyor..."; $("#compare-2058").textContent = "Yanıt bekleniyor...";
   const controller = new AbortController(), request = { controller, kind: "compare" };
@@ -311,6 +364,7 @@ compareForm.addEventListener("submit", async (event) => {
     }));
     if (activeRequest === request) {
       completedComparison = { question, retro: $("#compare-1998").textContent, future: $("#compare-2058").textContent };
+      $("#share-actions").hidden = false;
       $("#capsule-panel").hidden = false;
       announcement.textContent = "İki dönemin yanıtı hazır.";
     }

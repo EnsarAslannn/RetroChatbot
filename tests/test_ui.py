@@ -1,6 +1,7 @@
 import socket
 import subprocess
 import time
+from pathlib import Path
 
 import pytest
 from playwright.sync_api import sync_playwright
@@ -135,6 +136,44 @@ def test_new_comparison_clears_old_capsule_and_waits_for_both_answers(page, serv
     page.locator("#compare-input").fill("Yeni soru")
     page.locator('#compare-form button[type="submit"]').click()
     assert page.locator("#capsule-result").is_hidden()
+
+
+def test_completed_comparison_can_be_shared_or_downloaded(page, server):
+    page.add_init_script("""window.sharedData = null; navigator.share = async (data) => { window.sharedData = data; };""")
+    page.route("**/api/chat/stream", lambda route: stream_response(route, f'{route.request.post_data_json["era"]} yanıtı'))
+    page.goto(server)
+    page.locator("#compare-toggle").click()
+    page.locator("#compare-input").fill("Nasıl iletişim kuracağız?")
+    page.locator('#compare-form button[type="submit"]').click()
+    page.get_by_role("button", name="Paylaş").wait_for(state="visible")
+    page.get_by_role("button", name="Paylaş").click()
+    shared = page.evaluate("window.sharedData")
+    assert "Nasıl iletişim kuracağız?" in shared["text"]
+    assert "1998 yanıtı" in shared["text"]
+    assert "2058 yanıtı" in shared["text"]
+    with page.expect_download() as text_download:
+        page.get_by_role("button", name="Metin indir").click()
+    assert text_download.value.suggested_filename.endswith(".txt")
+    assert "2058 yanıtı" in Path(text_download.value.path()).read_text(encoding="utf-8")
+    with page.expect_download() as image_download:
+        page.get_by_role("button", name="Görsel indir").click()
+    assert image_download.value.suggested_filename.endswith(".png")
+    assert Path(image_download.value.path()).read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
+
+
+def test_share_falls_back_to_copy_when_native_share_is_missing(page, server):
+    page.add_init_script("""window.copiedText = null;
+      Object.defineProperty(navigator, 'share', {value: undefined, configurable: true});
+      Object.defineProperty(navigator, 'clipboard', {value: {writeText: async text => {window.copiedText = text;}}});
+    """)
+    page.route("**/api/chat/stream", lambda route: stream_response(route, "Kısa yanıt"))
+    page.goto(server)
+    page.locator("#compare-toggle").click()
+    page.locator("#compare-input").fill("Örnek soru")
+    page.locator('#compare-form button[type="submit"]').click()
+    page.get_by_role("button", name="Paylaş").click()
+    assert "Örnek soru" in page.evaluate("window.copiedText")
+    assert page.locator("#share-status").get_by_text("Karşılaştırma kopyalandı.").is_visible()
 
 
 def test_compare_error_clears_waiting_labels(page, server):
