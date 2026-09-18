@@ -98,6 +98,45 @@ def test_compare_asks_both_eras_without_adding_to_chat(page, server):
     assert page.locator(".user-message").count() == 0
 
 
+def test_time_capsule_uses_completed_comparison_and_stays_out_of_chat(page, server):
+    requests = []
+
+    def answer(route):
+        payload = route.request.post_data_json
+        requests.append(payload)
+        if "üç dönüm noktası" in payload["message"].lower():
+            stream_response(route, "2035: Yeni ağlar kuruldu.")
+        else:
+            stream_response(route, f'{payload["era"]} yanıtı')
+
+    page.route("**/api/chat/stream", answer)
+    page.goto(server)
+    page.locator("#compare-toggle").click()
+    page.get_by_role("button", name="İletişim", exact=True).click()
+    assert page.locator("#compare-input").input_value() == "İnsanlar birbirleriyle nasıl iletişim kuruyor?"
+    page.locator('#compare-form button[type="submit"]').click()
+    page.get_by_role("button", name="Zaman kapsülünü aç").click()
+    page.locator("#capsule-result").get_by_text("2035: Yeni ağlar kuruldu.", exact=False).wait_for()
+    assert requests[-1]["era"] == "2058"
+    assert "1998 yanıtı" in requests[-1]["message"]
+    assert "2058 yanıtı" in requests[-1]["message"]
+    assert page.locator(".user-message").count() == 0
+
+
+def test_new_comparison_clears_old_capsule_and_waits_for_both_answers(page, server):
+    page.route("**/api/chat/stream", lambda route: stream_response(route, "Dönem yanıtı"))
+    page.goto(server)
+    page.locator("#compare-toggle").click()
+    page.locator("#compare-input").fill("İlk soru")
+    page.locator('#compare-form button[type="submit"]').click()
+    page.get_by_role("button", name="Zaman kapsülünü aç").wait_for(state="visible")
+    page.get_by_role("button", name="Zaman kapsülünü aç").click()
+    page.locator("#capsule-result").get_by_text("Dönem yanıtı").wait_for()
+    page.locator("#compare-input").fill("Yeni soru")
+    page.locator('#compare-form button[type="submit"]').click()
+    assert page.locator("#capsule-result").is_hidden()
+
+
 def test_compare_error_clears_waiting_labels(page, server):
     page.route(
         "**/api/chat/stream",

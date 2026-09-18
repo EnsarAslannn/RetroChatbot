@@ -2,6 +2,7 @@ const $ = (s) => document.querySelector(s);
 const input = $("#message-input"), chatLog = $("#chat-log"), statusText = $("#status-text");
 const typing = $("#typing"), cancelButton = $("#cancel-button"), announcement = $("#announcement");
 const chatError = $("#chat-error"), comparePanel = $("#compare-panel"), compareResults = $("#compare-results");
+let completedComparison = null;
 const storageKey = "retrochat-sessions-v1";
 
 function sendEvent(event) {
@@ -136,6 +137,7 @@ function setBusy(busy, kind = "chat") {
   input.disabled = busy; $("#send-button").disabled = busy;
   typing.hidden = !busy || kind !== "chat"; cancelButton.hidden = !busy || kind !== "chat";
   $("#compare-cancel").hidden = !busy || kind !== "compare";
+  $("#capsule-open").disabled = busy;
   $("#compare-input").disabled = busy; compareForm.querySelector('button[type="submit"]').disabled = busy;
   statusText.textContent = busy ? kind === "compare" ? "İki dönem yanıtlıyor..." : "Yanıt bekleniyor..." : era === "2058" ? "Sistem hazır" : "Hazır";
 }
@@ -260,11 +262,41 @@ $("#compare-close").addEventListener("click", () => {
   comparePanel.hidden = true; $("#compare-toggle").setAttribute("aria-expanded", "false"); $("#compare-toggle").focus();
 });
 $("#compare-cancel").addEventListener("click", () => activeRequest?.controller.abort());
+document.querySelectorAll(".topic-chip").forEach((button) => button.addEventListener("click", () => {
+  $("#compare-input").value = button.dataset.question;
+  $("#compare-input").focus();
+}));
+$("#capsule-open").addEventListener("click", async () => {
+  if (!completedComparison || activeRequest) return;
+  const { question, retro, future } = completedComparison;
+  const message = `Bu karşılaştırma için 1998'den 2058'e uzanan üç dönüm noktası anlat. Yılları sırala. 2058 kısmı açıkça yaratıcı kurgu olsun; doğrulanmış tarih veya öngörü gibi sunma. Kısa ve anlaşılır yaz.\nSoru: ${question.slice(0, 500)}\n1998 yanıtı: ${retro.slice(0, 400)}\n2058 yanıtı: ${future.slice(0, 400)}`;
+  const controller = new AbortController(), request = { controller, kind: "compare" };
+  activeRequest = request; setBusy(true, "compare");
+  $("#capsule-result").hidden = false; $("#capsule-error").hidden = true;
+  $("#capsule-text").textContent = "Dönüm noktaları hazırlanıyor...";
+  try {
+    const reply = await streamReply(message, [], "2058", controller.signal, (value) => {
+      if (activeRequest === request) $("#capsule-text").textContent = value;
+    });
+    if (activeRequest === request) {
+      if (!reply.trim()) throw new Error("Boş yanıt alındı. Tekrar dene.");
+      $("#capsule-text").textContent = reply;
+      announcement.textContent = "Zaman kapsülü hazır.";
+    }
+  } catch (error) {
+    if (activeRequest === request) {
+      $("#capsule-result").hidden = true;
+      $("#capsule-error").textContent = error.name === "AbortError" ? "Zaman kapsülü durduruldu." : error.message;
+      $("#capsule-error").hidden = false;
+    }
+  } finally { if (activeRequest === request) { activeRequest = null; setBusy(false); } }
+});
 const compareForm = $("#compare-form");
 compareForm.addEventListener("submit", async (event) => {
   event.preventDefault(); const question = $("#compare-input").value.trim();
   if (!question || activeRequest) return;
   sendEvent("comparison_started");
+  completedComparison = null; $("#capsule-panel").hidden = true; $("#capsule-result").hidden = true;
   $("#compare-error").hidden = true; compareResults.hidden = false;
   $("#compare-1998").textContent = "Yanıt bekleniyor..."; $("#compare-2058").textContent = "Yanıt bekleniyor...";
   const controller = new AbortController(), request = { controller, kind: "compare" };
@@ -277,7 +309,11 @@ compareForm.addEventListener("submit", async (event) => {
       });
       if (activeRequest === request) target.textContent = reply;
     }));
-    if (activeRequest === request) announcement.textContent = "İki dönemin yanıtı hazır.";
+    if (activeRequest === request) {
+      completedComparison = { question, retro: $("#compare-1998").textContent, future: $("#compare-2058").textContent };
+      $("#capsule-panel").hidden = false;
+      announcement.textContent = "İki dönemin yanıtı hazır.";
+    }
   } catch (error) {
     if (activeRequest === request) {
       controller.abort(); $("#compare-error").textContent = error.name === "AbortError" ? "Karşılaştırma durduruldu." : error.message;

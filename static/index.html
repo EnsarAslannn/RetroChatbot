@@ -52,6 +52,11 @@
         <p>2058 yanıtı yaratıcı bir gelecek kurgusudur; doğrulanmış bir öngörü değildir.</p>
         <form id="compare-form">
           <label for="compare-input">Karşılaştırmak istediğin soru</label>
+          <div class="topic-list" aria-label="Konu seç">
+            <button type="button" class="topic-chip" data-question="İnsanlar birbirleriyle nasıl iletişim kuruyor?">İletişim</button>
+            <button type="button" class="topic-chip" data-question="İnsanlar nasıl eğitim alıyor?">Eğitim</button>
+            <button type="button" class="topic-chip" data-question="Günlük yaşam nasıl geçiyor?">Günlük yaşam</button>
+          </div>
           <div class="compare-input-row"><input id="compare-input" maxlength="2000" required placeholder="Örn. Arkadaşlarımızla nasıl iletişim kuracağız?"><button type="submit">Karşılaştır</button></div>
         </form>
         <button id="compare-cancel" type="button" class="small-button" hidden>Karşılaştırmayı durdur</button>
@@ -59,6 +64,14 @@
         <div id="compare-results" class="compare-results" hidden>
           <article class="era-result"><span>1998 / RETROCHAT</span><p id="compare-1998"></p></article>
           <article class="era-result"><span>2058 / FUTURECHAT · GELECEK KURGUSU</span><p id="compare-2058"></p></article>
+        </div>
+        <div id="capsule-panel" class="capsule-panel" hidden>
+          <button id="capsule-open" type="button" class="small-button">Zaman kapsülünü aç</button>
+          <div id="capsule-result" role="status" hidden>
+            <h3>1998’den 2058’e · Kurgusal dönüm noktaları</h3>
+            <p id="capsule-text"></p>
+          </div>
+          <div id="capsule-error" class="inline-error" role="alert" hidden></div>
         </div>
       </section>
 
