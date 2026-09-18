@@ -395,6 +395,10 @@ body[data-era="2058"] .counter span { border: 0; color: var(--future-green); bac
 .sessions-heading { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
 .sessions h2 { margin: 0; font: bold 16px Arial, sans-serif; }
 .sessions p { margin: 8px 0 14px; font: 12px Arial, sans-serif; }
+.session-search-label { display: block; margin: 0 0 5px; font: bold 12px Arial, sans-serif; }
+#session-search { width: 100%; min-height: 44px; margin-bottom: 10px; padding: 8px; border: 2px inset #fff; font: 13px Arial, sans-serif; }
+.session-exports { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.session-exports button { min-height: 40px; }
 .small-button { min-height: 32px; padding: 5px 9px; font: bold 12px Arial, sans-serif; }
 .session-list { display: grid; gap: 6px; max-height: 420px; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
 .session-item { width: 100%; min-height: 42px; padding: 7px 8px; border: 2px outset #fff; background: #e8e8e8; font: 12px/1.2 Arial, sans-serif; font-weight: 600; text-align: left; overflow-wrap: anywhere; }
@@ -416,6 +420,7 @@ body[data-era="2058"] .eyebrow { color: #8bf5ff; }
 body[data-era="2058"] .intro-panel > div > p:last-child, body[data-era="2058"] .compare-panel > p, body[data-era="2058"] .sessions > p, body[data-era="2058"] .chat-guide { color: #b2c0d5; }
 body[data-era="2058"] .session-item { border: 1px solid rgba(139,245,255,.14); border-radius: 10px; background: rgba(255,255,255,.04); color: #e6f5fa; }
 body[data-era="2058"] .session-item[aria-current="true"] { border-color: #8bf5ff; background: rgba(139,245,255,.12); }
+body[data-era="2058"] #session-search { border: 1px solid rgba(139,245,255,.28); border-radius: 10px; background: #0b1221; color: #f5f7ff; }
 body[data-era="2058"] .text-button { color: #ffc7d3; background: transparent; box-shadow: none; }
 body[data-era="2058"] .prompt-chip { min-height: 32px; border: 1px solid rgba(139,245,255,.28); border-radius: 999px; background: rgba(139,245,255,.08); color: #e5f9ff; box-shadow: none; }
 body[data-era="2058"] .prompt-chip:hover { background: rgba(139,245,255,.2); color: #fff; }

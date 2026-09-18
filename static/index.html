@@ -86,7 +86,14 @@
         <aside class="sessions" aria-labelledby="sessions-title">
           <div class="sessions-heading"><h2 id="sessions-title">Sohbetlerim</h2><button id="new-chat" type="button" class="small-button">Yeni sohbet</button></div>
           <p>Bu cihazda saklanır.</p>
+          <label class="session-search-label" for="session-search">Sohbetlerde ara</label>
+          <input id="session-search" type="search" placeholder="Başlık veya mesaj" autocomplete="off">
           <ul id="session-list" class="session-list"></ul>
+          <p id="session-search-empty" role="status" hidden>Eşleşen sohbet yok.</p>
+          <div class="session-exports">
+            <button id="export-json" type="button" class="small-button">JSON indir</button>
+            <button id="export-text" type="button" class="small-button">Sohbet metni indir</button>
+          </div>
           <button id="delete-chat" type="button" class="text-button">Bu sohbeti sil</button>
         </aside>
 

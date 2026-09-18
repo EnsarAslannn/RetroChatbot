@@ -1,3 +1,4 @@
+import json
 import socket
 import subprocess
 import time
@@ -174,6 +175,29 @@ def test_share_falls_back_to_copy_when_native_share_is_missing(page, server):
     page.get_by_role("button", name="Paylaş").click()
     assert "Örnek soru" in page.evaluate("window.copiedText")
     assert page.locator("#share-status").get_by_text("Karşılaştırma kopyalandı.").is_visible()
+
+
+def test_saved_chats_are_searchable_by_message_and_exportable(page, server):
+    page.add_init_script("""localStorage.setItem('retrochat-sessions-v1', JSON.stringify([
+      {id:'one',era:'1998',title:'İlk sohbet',updated:2,messages:[
+        {role:'user',content:'Modem nasıl çalışır?'},{role:'assistant',content:'Telefon hattıyla.'}]},
+      {id:'two',era:'2058',title:'İkinci sohbet',updated:1,messages:[
+        {role:'user',content:'Gelecekte ulaşım?'},{role:'assistant',content:'Yeni araçlarla.'}]}
+    ]));""")
+    page.goto(server)
+    page.get_by_role("searchbox", name="Sohbetlerde ara").fill("ulaşım")
+    assert page.get_by_role("button", name="2058 · İkinci sohbet").is_visible()
+    assert page.get_by_role("button", name="1998 · İlk sohbet").count() == 0
+    with page.expect_download() as json_download:
+        page.get_by_role("button", name="JSON indir").click()
+    exported = json.loads(Path(json_download.value.path()).read_text(encoding="utf-8"))
+    assert len(exported) == 2
+    assert exported[0]["messages"][0]["content"] == "Modem nasıl çalışır?"
+    with page.expect_download() as text_download:
+        page.get_by_role("button", name="Sohbet metni indir").click()
+    text = Path(text_download.value.path()).read_text(encoding="utf-8")
+    assert "Modem nasıl çalışır?" in text
+    assert "Gelecekte ulaşım?" in text
 
 
 def test_compare_error_clears_waiting_labels(page, server):

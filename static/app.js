@@ -88,7 +88,11 @@ function addMessage(role, content, label = timeLabel()) {
 
 function renderSessions() {
   const list = $("#session-list"); list.replaceChildren();
-  for (const session of sessions) {
+  const query = $("#session-search").value.trim().toLocaleLowerCase("tr-TR");
+  const matches = sessions.filter((session) => !query || [session.title, ...session.messages.map((message) => message.content)]
+    .some((value) => value.toLocaleLowerCase("tr-TR").includes(query)));
+  $("#session-search-empty").hidden = matches.length > 0;
+  for (const session of matches) {
     const button = document.createElement("button"); button.type = "button";
     button.className = "session-item";
     if (session.id === activeId) button.setAttribute("aria-current", "true");
@@ -100,6 +104,8 @@ function renderSessions() {
     const row = document.createElement("li"); row.append(button); list.append(row);
   }
   $("#delete-chat").disabled = !currentSession()?.messages.length;
+  $("#export-json").disabled = !sessions.some((session) => session.messages.length);
+  $("#export-text").disabled = $("#export-json").disabled;
 }
 
 function renderEra() {
@@ -238,6 +244,7 @@ $("#era-toggle").addEventListener("click", () => {
   announcement.textContent = `${nextEra} dönemine geçildi. ${eraContent[nextEra].disclaimer}`; input.focus();
 });
 $("#new-chat").addEventListener("click", () => { cancelActive(); newSession(); input.focus(); });
+$("#session-search").addEventListener("input", renderSessions);
 $("#delete-chat").addEventListener("click", () => {
   cancelActive(); sessions = sessions.filter((item) => item.id !== activeId);
   const existing = sessions.find((item) => item.era === era);
@@ -276,6 +283,16 @@ function downloadBlob(blob, filename) {
   link.href = url; link.download = filename; document.body.append(link); link.click(); link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+$("#export-json").addEventListener("click", () => {
+  downloadBlob(new Blob([JSON.stringify(sessions, null, 2)], { type: "application/json;charset=utf-8" }), "retrochat-sohbetler.json");
+});
+$("#export-text").addEventListener("click", () => {
+  const text = sessions.map((session) => [
+    `${session.era} · ${session.title}`,
+    ...session.messages.map((message) => `${message.role === "user" ? "Sen" : "Sohbet botu"}: ${message.content}`)
+  ].join("\n\n")).join("\n\n---\n\n");
+  downloadBlob(new Blob([text], { type: "text/plain;charset=utf-8" }), "retrochat-sohbetler.txt");
+});
 async function copyComparison() {
   try { await navigator.clipboard.writeText(comparisonText()); $("#share-status").textContent = "Karşılaştırma kopyalandı."; }
   catch { $("#share-status").textContent = "Kopyalanamadı. Metin indir seçeneğini kullan."; }
