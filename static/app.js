@@ -5,6 +5,44 @@ const chatError = $("#chat-error"), comparePanel = $("#compare-panel"), compareR
 let completedComparison = null;
 const storageKey = "retrochat-sessions-v1";
 const preferencesKey = "retrochat-reading-v1";
+const comparisonsKey = "retrochat-comparisons-v1";
+function readComparisons() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(comparisonsKey) || "[]");
+    if (!Array.isArray(saved)) return [];
+    return saved.filter((item) => item && typeof item.id === "string" && typeof item.question === "string"
+      && typeof item.retro === "string" && typeof item.future === "string").slice(0, 30);
+  } catch { return []; }
+}
+let comparisons = readComparisons();
+function persistComparisons() {
+  comparisons = comparisons.slice(0, 30);
+  try { localStorage.setItem(comparisonsKey, JSON.stringify(comparisons)); }
+  catch { statusText.textContent = "Karşılaştırma geçmişi kaydedilemedi"; }
+}
+function openComparison(comparison) {
+  completedComparison = comparison;
+  $("#compare-input").value = comparison.question;
+  $("#compare-1998").textContent = comparison.retro;
+  $("#compare-2058").textContent = comparison.future;
+  compareResults.hidden = false;
+  $("#share-actions").hidden = false;
+  $("#capsule-panel").hidden = false;
+  $("#capsule-result").hidden = true;
+  $("#capsule-error").hidden = true;
+}
+function renderComparisonHistory() {
+  const section = $("#comparison-history"), list = $("#comparison-history-list");
+  list.replaceChildren(); section.hidden = comparisons.length === 0;
+  for (const comparison of comparisons) {
+    const button = document.createElement("button");
+    button.type = "button"; button.className = "small-button";
+    button.textContent = comparison.question;
+    button.setAttribute("aria-label", `Karşılaştırmayı aç: ${comparison.question}`);
+    button.addEventListener("click", () => openComparison(comparison));
+    const item = document.createElement("li"); item.append(button); list.append(item);
+  }
+}
 function readPreferences() {
   try {
     const saved = JSON.parse(localStorage.getItem(preferencesKey) || "{}");
@@ -459,7 +497,8 @@ compareForm.addEventListener("submit", async (event) => {
       if (activeRequest === request) target.textContent = reply;
     }));
     if (activeRequest === request) {
-      completedComparison = { question, retro: $("#compare-1998").textContent, future: $("#compare-2058").textContent };
+      completedComparison = { id: crypto.randomUUID(), question, retro: $("#compare-1998").textContent, future: $("#compare-2058").textContent, updated: Date.now() };
+      comparisons.unshift(completedComparison); persistComparisons(); renderComparisonHistory();
       $("#share-actions").hidden = false;
       $("#capsule-panel").hidden = false;
       announcement.textContent = "İki dönemin yanıtı hazır.";
@@ -478,4 +517,5 @@ compareForm.addEventListener("submit", async (event) => {
 
 applyPreferences();
 if (!activeId) newSession(); else render();
+renderComparisonHistory();
 sendEvent("page_view");

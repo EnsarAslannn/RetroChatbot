@@ -100,6 +100,24 @@ def test_compare_asks_both_eras_without_adding_to_chat(page, server):
     assert page.locator(".user-message").count() == 0
 
 
+def test_completed_comparison_persists_after_reload_and_can_be_reopened(page, server):
+    page.route("**/api/chat/stream", lambda route: stream_response(route, f'{route.request.post_data_json["era"]} yanıtı'))
+    page.goto(server)
+    page.get_by_role("button", name="İki dönemi karşılaştır").click()
+    page.locator("#compare-input").fill("İletişim nasıl değişti?")
+    page.get_by_role("button", name="Karşılaştır", exact=True).click()
+    page.get_by_role("button", name="Karşılaştırmayı aç: İletişim nasıl değişti?").wait_for()
+
+    page.reload()
+    page.get_by_role("button", name="İki dönemi karşılaştır").click()
+    page.get_by_role("button", name="Karşılaştırmayı aç: İletişim nasıl değişti?").click()
+
+    assert page.locator("#compare-input").input_value() == "İletişim nasıl değişti?"
+    assert page.locator("#compare-1998").get_by_text("1998 yanıtı", exact=True).is_visible()
+    assert page.locator("#compare-2058").get_by_text("2058 yanıtı", exact=True).is_visible()
+    assert page.get_by_role("button", name="Paylaş").is_visible()
+
+
 def test_time_capsule_uses_completed_comparison_and_stays_out_of_chat(page, server):
     requests = []
 

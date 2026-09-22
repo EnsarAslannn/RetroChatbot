@@ -18,6 +18,7 @@ Demo medyası `scripts/capture_demo.py` ile örnek yanıtlar kullanılarak üret
 - 1998 ve 2058 kişilikleri arasında geçiş; her dönemin sohbeti ayrı tutulur.
 - Aynı sorunun iki dönemdeki yanıtını eş zamanlı karşılaştırma.
 - Karşılaştırmada konu seçimi ve iki yanıt tamamlanınca 1998–2058 arasındaki üç kurgusal dönüm noktasını anlatan zaman kapsülü.
+- Tamamlanan karşılaştırmaları bu cihazda saklayan ve daha sonra yeniden açan karşılaştırma geçmişi.
 - Tamamlanan karşılaştırmayı cihazın paylaşım menüsüyle paylaşma; destek yoksa kopyalama, ayrıca metin veya PNG olarak indirme.
 - Akış hâlinde görünen yanıtlar, bekleyen isteği durdurma, anlaşılır hata ve tek tıkla tekrar deneme.
 - Bu cihazda saklanan sohbetler; yeni sohbet açma, eski sohbeti seçme ve silme.

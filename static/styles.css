@@ -378,6 +378,10 @@ body[data-era="2058"] .counter span { border: 0; color: var(--future-green); bac
 .compare-input-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
 .compare-input-row input { min-width: 0; min-height: 48px; padding: 10px; border: 3px inset #fff; font: 15px Arial, sans-serif; }
 .compare-input-row button { min-height: 48px; padding: 0 16px; }
+.comparison-history { margin: 0 0 14px; }
+.comparison-history h3 { margin: 0 0 7px; font: bold 14px Arial, sans-serif; }
+.comparison-history ul { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.comparison-history button { min-height: 44px; padding: 7px 12px; text-align: left; }
 .compare-results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
 .era-result { min-height: 110px; padding: 13px 15px; border: 2px inset #fff; background: #060a18; color: #e9fafa; }
 .era-result:nth-child(2) { border-color: #9ccbf5; background: #11152b; }
@@ -435,6 +439,7 @@ body[data-era="2058"] .text-button { color: #ffc7d3; background: transparent; bo
 body[data-era="2058"] .prompt-chip { min-height: 32px; border: 1px solid rgba(139,245,255,.28); border-radius: 999px; background: rgba(139,245,255,.08); color: #e5f9ff; box-shadow: none; }
 body[data-era="2058"] .prompt-chip:hover { background: rgba(139,245,255,.2); color: #fff; }
 body[data-era="2058"] .topic-chip { border: 1px solid rgba(139,245,255,.28); border-radius: 999px; background: rgba(139,245,255,.08); color: #e5f9ff; box-shadow: none; }
+body[data-era="2058"] .comparison-history button { border: 1px solid rgba(139,245,255,.28); border-radius: 10px; background: rgba(139,245,255,.08); color: #e5f9ff; box-shadow: none; }
 body[data-era="2058"] .capsule-panel #capsule-result { border: 1px solid rgba(139,245,255,.24); border-radius: 14px; background: #11152b; color: #e9fafa; }
 body[data-era="2058"] .compare-input-row input { border: 1px solid rgba(139,245,255,.28); border-radius: 12px; background: #0b1221; color: #f5f7ff; }
 body[data-era="2058"] .era-result { border: 1px solid rgba(139,245,255,.24); border-radius: 14px; }
