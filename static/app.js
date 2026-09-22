@@ -120,6 +120,7 @@ function readSessions() {
 
 let sessions = readSessions(), activeId = sessions[0]?.id || null, era = sessions[0]?.era || "1998";
 let activeRequest = null, failedIndex = null;
+let deletedChat = null, deleteUndoTimer = null;
 const currentSession = () => sessions.find((item) => item.id === activeId);
 const timeLabel = () => new Intl.DateTimeFormat("tr-TR", { hour: "2-digit", minute: "2-digit" }).format(new Date());
 
@@ -368,10 +369,31 @@ $("#split-answers").addEventListener("change", (event) => {
   if (!activeRequest) render();
 });
 $("#delete-chat").addEventListener("click", () => {
-  cancelActive(); sessions = sessions.filter((item) => item.id !== activeId);
+  cancelActive();
+  if (deleteUndoTimer) clearTimeout(deleteUndoTimer);
+  const deletedIndex = sessions.findIndex((item) => item.id === activeId);
+  deletedChat = { session: currentSession(), index: deletedIndex, replacementId: null };
+  sessions = sessions.filter((item) => item.id !== activeId);
   const existing = sessions.find((item) => item.era === era);
   if (existing) { activeId = existing.id; persist(); render(); } else newSession();
+  if (!existing) deletedChat.replacementId = activeId;
+  $("#delete-undo").hidden = false;
+  deleteUndoTimer = setTimeout(() => {
+    deletedChat = null; deleteUndoTimer = null; $("#delete-undo").hidden = true;
+  }, 8000);
   announcement.textContent = "Sohbet silindi.";
+});
+$("#undo-delete").addEventListener("click", () => {
+  if (!deletedChat?.session) return;
+  if (deleteUndoTimer) clearTimeout(deleteUndoTimer);
+  if (deletedChat.replacementId) {
+    sessions = sessions.filter((item) => item.id !== deletedChat.replacementId || item.messages.length);
+  }
+  sessions.splice(Math.max(0, deletedChat.index), 0, deletedChat.session);
+  activeId = deletedChat.session.id; era = deletedChat.session.era;
+  deletedChat = null; deleteUndoTimer = null; $("#delete-undo").hidden = true;
+  persist(); render(); input.focus();
+  announcement.textContent = "Silinen sohbet geri getirildi.";
 });
 document.querySelectorAll(".prompt-chip").forEach((button) => button.addEventListener("click", () => {
   input.value = button.dataset.prompt; $("#char-count").textContent = `${input.value.length} / 2000`; input.focus();

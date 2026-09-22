@@ -365,6 +365,22 @@ def test_prompt_fills_composer_and_deleting_chat_removes_saved_message(page, ser
     assert page.locator("#chat-log").get_by_text("İnsanlar internete nasıl bağlanıyor?", exact=True).count() == 0
 
 
+def test_deleted_chat_can_be_undone_and_remains_after_reload(page, server):
+    page.route("**/api/chat/stream", lambda route: stream_response(route))
+    page.goto(server)
+    page.locator("#message-input").fill("Geri getirilecek sohbet")
+    page.locator("#send-button").click()
+    page.locator("#chat-log").get_by_text("Yanıt geldi", exact=True).wait_for()
+
+    page.get_by_role("button", name="Bu sohbeti sil").click()
+    page.get_by_role("button", name="Silmeyi geri al").click()
+
+    assert page.locator("#chat-log").get_by_text("Geri getirilecek sohbet", exact=True).is_visible()
+    assert page.locator("#chat-log").get_by_text("Yanıt geldi", exact=True).is_visible()
+    page.reload()
+    assert page.locator("#chat-log").get_by_text("Geri getirilecek sohbet", exact=True).is_visible()
+
+
 def test_mobile_page_has_no_horizontal_overflow_or_script_error(page, server):
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))

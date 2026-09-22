@@ -107,6 +107,10 @@
             <label class="split-setting" for="split-answers"><input id="split-answers" type="checkbox"> Uzun yanıtları bölümle</label>
           </fieldset>
           <button id="delete-chat" type="button" class="text-button">Bu sohbeti sil</button>
+          <div id="delete-undo" class="delete-undo" aria-live="polite" hidden>
+            <span>Sohbet silindi.</span>
+            <button id="undo-delete" type="button" class="small-button" aria-label="Silmeyi geri al">Geri al</button>
+          </div>
         </aside>
 
       <section class="chat-window" aria-labelledby="window-title">

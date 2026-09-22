@@ -22,7 +22,7 @@ Demo medyası `scripts/capture_demo.py` ile örnek yanıtlar kullanılarak üret
 - Karşılaştırmadaki soru ve yanıtı bağlam olarak koruyup 1998 ya da 2058 sohbetinde devam etme.
 - Tamamlanan karşılaştırmayı cihazın paylaşım menüsüyle paylaşma; destek yoksa kopyalama, ayrıca metin veya PNG olarak indirme.
 - Akış hâlinde görünen yanıtlar, bekleyen isteği durdurma, anlaşılır hata ve tek tıkla tekrar deneme.
-- Bu cihazda saklanan sohbetler; yeni sohbet açma, eski sohbeti seçme ve silme.
+- Bu cihazda saklanan sohbetler; yeni sohbet açma, eski sohbeti seçme, silme ve kısa süre içinde silmeyi geri alma.
 - Kayıtlı sohbetleri başlık veya mesaj içeriğinde arama; tüm sohbetleri JSON ya da metin dosyası olarak indirme.
 - Tamamlanan yanıtlarda döneme uygunluk, yarım kalma ve tekrar için tek seçimlik geri bildirim; sunucuya yalnızca seçilen kategori gönderilir.
 - Önceki 2030 sohbetleri arşiv etiketiyle korunur; yeni 2058 yanıtlarına eski dönem konuşması bağlam olarak gönderilmez.
