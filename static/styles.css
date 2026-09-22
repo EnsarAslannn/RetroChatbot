@@ -388,6 +388,7 @@ body[data-era="2058"] .counter span { border: 0; color: var(--future-green); bac
 .era-result span { display: block; margin-bottom: 10px; color: #73ffef; font: bold 11px Arial, sans-serif; letter-spacing: .08em; }
 .era-result:nth-child(2) span { color: #c1b1ff; }
 .era-result p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.era-result .continue-comparison { min-height: 44px; margin-top: 12px; }
 .share-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
 .share-actions button { min-height: 44px; }
 .share-actions span { font: 13px/1.4 Arial, sans-serif; }

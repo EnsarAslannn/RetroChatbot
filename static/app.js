@@ -20,6 +20,10 @@ function persistComparisons() {
   try { localStorage.setItem(comparisonsKey, JSON.stringify(comparisons)); }
   catch { statusText.textContent = "Karşılaştırma geçmişi kaydedilemedi"; }
 }
+function showComparisonActions(show) {
+  $("#continue-1998").hidden = !show;
+  $("#continue-2058").hidden = !show;
+}
 function openComparison(comparison) {
   completedComparison = comparison;
   $("#compare-input").value = comparison.question;
@@ -30,6 +34,7 @@ function openComparison(comparison) {
   $("#capsule-panel").hidden = false;
   $("#capsule-result").hidden = true;
   $("#capsule-error").hidden = true;
+  showComparisonActions(true);
 }
 function renderComparisonHistory() {
   const section = $("#comparison-history"), list = $("#comparison-history-list");
@@ -395,6 +400,25 @@ function comparisonText() {
   const { question, retro, future } = completedComparison;
   return `RetroChat 98 / FutureChat 2058\nSoru: ${question}\n\n1998 / RETROCHAT\n${retro}\n\n2058 / FUTURECHAT (gelecek kurgusu)\n${future}\n\n2058 yanıtı yaratıcı bir gelecek kurgusudur; doğrulanmış bir öngörü değildir.`;
 }
+function continueComparison(selectedEra) {
+  if (!completedComparison) return;
+  const answer = selectedEra === "1998" ? completedComparison.retro : completedComparison.future;
+  const question = completedComparison.question;
+  const title = question.length > 30 ? `${question.slice(0, 30)}…` : question;
+  const continuedSession = {
+    id: crypto.randomUUID(), era: selectedEra, title, updated: Date.now(),
+    messages: [
+      { role: "user", content: question, time: timeLabel() },
+      { role: "assistant", content: answer, time: timeLabel() }
+    ]
+  };
+  sessions.unshift(continuedSession); activeId = continuedSession.id; era = selectedEra;
+  persist(); comparePanel.hidden = true; $("#compare-toggle").setAttribute("aria-expanded", "false");
+  render(); input.focus();
+  announcement.textContent = `${selectedEra} sohbetinde devam ediliyor.`;
+}
+$("#continue-1998").addEventListener("click", () => continueComparison("1998"));
+$("#continue-2058").addEventListener("click", () => continueComparison("2058"));
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob), link = document.createElement("a");
   link.href = url; link.download = filename; document.body.append(link); link.click(); link.remove();
@@ -483,6 +507,7 @@ compareForm.addEventListener("submit", async (event) => {
   if (!question || activeRequest) return;
   sendEvent("comparison_started");
   completedComparison = null; $("#share-actions").hidden = true; $("#share-status").textContent = "";
+  showComparisonActions(false);
   $("#capsule-panel").hidden = true; $("#capsule-result").hidden = true;
   $("#compare-error").hidden = true; compareResults.hidden = false;
   $("#compare-1998").textContent = "Yanıt bekleniyor..."; $("#compare-2058").textContent = "Yanıt bekleniyor...";
@@ -501,6 +526,7 @@ compareForm.addEventListener("submit", async (event) => {
       comparisons.unshift(completedComparison); persistComparisons(); renderComparisonHistory();
       $("#share-actions").hidden = false;
       $("#capsule-panel").hidden = false;
+      showComparisonActions(true);
       announcement.textContent = "İki dönemin yanıtı hazır.";
     }
   } catch (error) {

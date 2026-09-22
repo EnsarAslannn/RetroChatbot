@@ -118,6 +118,37 @@ def test_completed_comparison_persists_after_reload_and_can_be_reopened(page, se
     assert page.get_by_role("button", name="Paylaş").is_visible()
 
 
+@pytest.mark.parametrize("selected_era", ["1998", "2058"])
+def test_comparison_can_continue_as_chat_in_either_era(page, server, selected_era):
+    requests = []
+
+    def answer(route):
+        payload = route.request.post_data_json
+        requests.append(payload)
+        stream_response(route, f'{payload["era"]} yanıtı')
+
+    page.route("**/api/chat/stream", answer)
+    page.goto(server)
+    page.get_by_role("button", name="İki dönemi karşılaştır").click()
+    page.locator("#compare-input").fill("İletişim nasıl değişti?")
+    page.get_by_role("button", name="Karşılaştır", exact=True).click()
+    page.get_by_role("button", name=f"{selected_era} sohbetinde devam et").click()
+
+    assert page.locator("body").get_attribute("data-era") == selected_era
+    assert page.locator("#chat-log").get_by_text("İletişim nasıl değişti?", exact=True).is_visible()
+    assert page.locator("#chat-log").get_by_text(f"{selected_era} yanıtı", exact=True).is_visible()
+
+    page.locator("#message-input").fill("Biraz daha anlat")
+    page.locator("#send-button").click()
+    page.locator("#chat-log").get_by_text(f"{selected_era} yanıtı", exact=True).nth(1).wait_for()
+    follow_up = next(item for item in requests if item["message"] == "Biraz daha anlat")
+    assert follow_up["era"] == selected_era
+    assert follow_up["history"] == [
+        {"role": "user", "content": "İletişim nasıl değişti?"},
+        {"role": "assistant", "content": f"{selected_era} yanıtı"},
+    ]
+
+
 def test_time_capsule_uses_completed_comparison_and_stays_out_of_chat(page, server):
     requests = []
 
