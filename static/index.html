@@ -96,8 +96,11 @@
           <p id="session-search-empty" role="status" hidden>Eşleşen sohbet yok.</p>
           <div class="session-exports">
             <button id="export-json" type="button" class="small-button">JSON indir</button>
+            <button id="import-json" type="button" class="small-button">JSON içe aktar</button>
             <button id="export-text" type="button" class="small-button">Sohbet metni indir</button>
           </div>
+          <input id="import-json-input" class="sr-only" type="file" accept="application/json,.json" tabindex="-1">
+          <p id="import-status" class="import-status" role="status" aria-live="polite"></p>
           <fieldset class="reading-settings">
             <legend>Okuma ayarları</legend>
             <label for="text-size">Yazı boyutu</label>

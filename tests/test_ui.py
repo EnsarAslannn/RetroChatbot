@@ -249,6 +249,51 @@ def test_saved_chats_are_searchable_by_message_and_exportable(page, server):
     assert "Gelecekte ulaşım?" in text
 
 
+def test_exported_json_format_can_be_imported_and_persists(page, server):
+    backup = [{
+        "id": "backup-chat",
+        "era": "2058",
+        "title": "Yedek sohbet",
+        "updated": 42,
+        "messages": [
+            {"role": "user", "content": "Yedekten gelen soru", "time": "10:00"},
+            {"role": "assistant", "content": "Yedekten gelen yanıt", "time": "10:01"},
+        ],
+    }]
+    page.goto(server)
+    import_button = page.get_by_role("button", name="JSON içe aktar")
+    assert import_button.bounding_box()["height"] >= 44
+    import_button.click()
+    page.locator("#import-json-input").set_input_files({
+        "name": "retrochat-sohbetler.json",
+        "mimeType": "application/json",
+        "buffer": json.dumps(backup, ensure_ascii=False).encode("utf-8"),
+    })
+
+    page.locator("#import-status").get_by_text("1 sohbet içe aktarıldı.").wait_for()
+    assert page.locator("#chat-log").get_by_text("Yedekten gelen soru", exact=True).is_visible()
+    assert page.locator("#chat-log").get_by_text("Yedekten gelen yanıt", exact=True).is_visible()
+    assert page.locator("body").get_attribute("data-era") == "2058"
+    page.reload()
+    assert page.get_by_role("button", name="2058 · Yedek sohbet").is_visible()
+
+
+def test_invalid_json_import_keeps_existing_chats(page, server):
+    page.add_init_script("""localStorage.setItem('retrochat-sessions-v1', JSON.stringify([{
+      id:'existing', era:'1998', title:'Korunan sohbet', updated:1,
+      messages:[{role:'user', content:'Bu içerik korunmalı'}]
+    }]));""")
+    page.goto(server)
+    page.get_by_role("button", name="JSON içe aktar").click()
+    page.locator("#import-json-input").set_input_files({
+        "name": "bozuk.json", "mimeType": "application/json", "buffer": b'{"not":"a chat backup"}'
+    })
+
+    page.locator("#import-status").get_by_text("Geçerli bir RetroChat JSON yedeği seç.").wait_for()
+    page.reload()
+    assert page.get_by_role("button", name="1998 · Korunan sohbet").is_visible()
+
+
 def test_reading_preferences_persist_and_split_long_answer(page, server):
     long_answer = "Bu bir deneme cümlesidir. " * 55
     page.route("**/api/chat/stream", lambda route: stream_response(route, long_answer))

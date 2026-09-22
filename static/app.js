@@ -118,6 +118,33 @@ function readSessions() {
   } catch { return []; }
 }
 
+function parseImportedSessions(text) {
+  const value = JSON.parse(text);
+  if (!Array.isArray(value) || value.length === 0) throw new Error("invalid backup");
+  return value.slice(0, 30).map((item) => {
+    if (!item || typeof item.id !== "string" || !item.id || !["1998", "2030", "2058"].includes(item.era)
+      || typeof item.title !== "string" || !item.title.trim() || item.title.length > 200
+      || typeof item.updated !== "number" || !Number.isFinite(item.updated) || !Array.isArray(item.messages)) {
+      throw new Error("invalid session");
+    }
+    const messages = item.messages.slice(-100).map((message) => {
+      if (!message || !["user", "assistant"].includes(message.role) || typeof message.content !== "string"
+        || !message.content.trim() || message.content.length > 20000
+        || (message.time !== undefined && (typeof message.time !== "string" || message.time.length > 30))) {
+        throw new Error("invalid message");
+      }
+      const normalized = { role: message.role, content: message.content };
+      if (message.time) normalized.time = message.time;
+      if (["period_fit", "incomplete", "repetitive"].includes(message.feedback)) normalized.feedback = message.feedback;
+      return normalized;
+    });
+    if (item.era === "2030") {
+      return { id: item.id, era: "2058", title: `2030 arşivi · ${item.title}`, updated: item.updated, messages, legacyMessageCount: messages.length };
+    }
+    return { id: item.id, era: item.era, title: item.title, updated: item.updated, messages };
+  });
+}
+
 let sessions = readSessions(), activeId = sessions[0]?.id || null, era = sessions[0]?.era || "1998";
 let activeRequest = null, failedIndex = null;
 let deletedChat = null, deleteUndoTimer = null;
@@ -448,6 +475,25 @@ function downloadBlob(blob, filename) {
 }
 $("#export-json").addEventListener("click", () => {
   downloadBlob(new Blob([JSON.stringify(sessions, null, 2)], { type: "application/json;charset=utf-8" }), "retrochat-sohbetler.json");
+});
+$("#import-json").addEventListener("click", () => $("#import-json-input").click());
+$("#import-json-input").addEventListener("change", async (event) => {
+  const file = event.target.files?.[0], importStatus = $("#import-status");
+  if (!file) return;
+  try {
+    const imported = parseImportedSessions(await file.text());
+    const importedIds = new Set(imported.map((session) => session.id));
+    const importedAt = Date.now();
+    imported.forEach((session, index) => { session.updated = importedAt - index; });
+    sessions = [...imported, ...sessions.filter((session) => !importedIds.has(session.id))].slice(0, 30);
+    activeId = imported[0].id; era = imported[0].era;
+    persist(); render();
+    importStatus.textContent = `${imported.length} sohbet içe aktarıldı.`;
+    announcement.textContent = importStatus.textContent;
+  } catch {
+    importStatus.textContent = "Geçerli bir RetroChat JSON yedeği seç.";
+    announcement.textContent = importStatus.textContent;
+  } finally { event.target.value = ""; }
 });
 $("#export-text").addEventListener("click", () => {
   const text = sessions.map((session) => [

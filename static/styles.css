@@ -411,7 +411,8 @@ body[data-era="2058"] .counter span { border: 0; color: var(--future-green); bac
 .session-search-label { display: block; margin: 0 0 5px; font: bold 12px Arial, sans-serif; }
 #session-search { width: 100%; min-height: 44px; margin-bottom: 10px; padding: 8px; border: 2px inset #fff; font: 13px Arial, sans-serif; }
 .session-exports { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-.session-exports button { min-height: 40px; }
+.session-exports button { min-height: 44px; }
+.sessions .import-status { margin: 8px 0 0; line-height: 1.4; }
 .small-button { min-height: 32px; padding: 5px 9px; font: bold 12px Arial, sans-serif; }
 .session-list { display: grid; gap: 6px; max-height: 420px; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
 .session-item { width: 100%; min-height: 42px; padding: 7px 8px; border: 2px outset #fff; background: #e8e8e8; font: 12px/1.2 Arial, sans-serif; font-weight: 600; text-align: left; overflow-wrap: anywhere; }
