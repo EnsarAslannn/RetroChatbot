@@ -25,9 +25,18 @@ function showComparisonActions(show) {
   $("#continue-1998").hidden = !show;
   $("#continue-2058").hidden = !show;
 }
+function resetRealityGuide() {
+  $("#reality-guide").hidden = true;
+  $("#reality-check-open").disabled = false;
+  $("#reality-check-open").setAttribute("aria-expanded", "false");
+  $("#reality-summary").textContent = "";
+  $("#reality-sources").replaceChildren();
+  $("#reality-error").hidden = true;
+}
 function openComparison(comparison) {
   completedComparison = comparison;
   activeShareUrl = null;
+  resetRealityGuide();
   $("#compare-input").value = comparison.question;
   $("#compare-1998").textContent = comparison.retro;
   $("#compare-2058").textContent = comparison.future;
@@ -539,6 +548,36 @@ $("#share-comparison").addEventListener("click", async () => {
   } finally { shareButton.disabled = false; }
 });
 $("#copy-comparison").addEventListener("click", () => { if (completedComparison) copyComparison(); });
+$("#reality-check-open").addEventListener("click", async () => {
+  if (!completedComparison) return;
+  const button = $("#reality-check-open"), guide = $("#reality-guide");
+  guide.hidden = false; button.disabled = true; button.setAttribute("aria-expanded", "true");
+  $("#reality-error").hidden = true;
+  $("#reality-summary").textContent = "1998 iddiaları kaynaklarla kontrol ediliyor...";
+  try {
+    const response = await fetch("/api/reality-check", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: completedComparison.question, retro: completedComparison.retro })
+    });
+    if (!response.ok) throw new Error("Tarihsel doğrulama tamamlanamadı. Tekrar dene.");
+    const result = await response.json();
+    $("#reality-summary").textContent = result.summary;
+    const sources = $("#reality-sources"); sources.replaceChildren();
+    for (const source of result.sources) {
+      const url = new URL(source.url);
+      if (!["http:", "https:"].includes(url.protocol)) continue;
+      const link = document.createElement("a");
+      link.href = url.href; link.textContent = source.title; link.target = "_blank"; link.rel = "noopener noreferrer";
+      const item = document.createElement("li"); item.append(link); sources.append(item);
+    }
+    announcement.textContent = "Gerçeklik rehberi hazır.";
+  } catch (error) {
+    $("#reality-summary").textContent = "";
+    $("#reality-error").textContent = error.message;
+    $("#reality-error").hidden = false;
+    button.disabled = false;
+  }
+});
 $("#download-text").addEventListener("click", () => {
   if (completedComparison) downloadBlob(new Blob([comparisonText()], { type: "text/plain;charset=utf-8" }), "retrochat-karsilastirma.txt");
 });
@@ -596,7 +635,7 @@ compareForm.addEventListener("submit", async (event) => {
   event.preventDefault(); const question = $("#compare-input").value.trim();
   if (!question || activeRequest) return;
   sendEvent("comparison_started");
-  completedComparison = null; activeShareUrl = null; $("#share-actions").hidden = true; $("#share-status").textContent = "";
+  completedComparison = null; activeShareUrl = null; resetRealityGuide(); $("#share-actions").hidden = true; $("#share-status").textContent = "";
   showComparisonActions(false);
   $("#capsule-panel").hidden = true; $("#capsule-result").hidden = true;
   $("#compare-error").hidden = true; compareResults.hidden = false;

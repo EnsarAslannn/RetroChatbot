@@ -153,6 +153,21 @@ class SharedComparison(BaseModel):
     future: str
 
 
+class RealityCheckRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=2000)
+    retro: str = Field(min_length=1, max_length=20000)
+
+
+class RealitySource(BaseModel):
+    title: str
+    url: str
+
+
+class RealityCheckResponse(BaseModel):
+    summary: str
+    sources: list[RealitySource]
+
+
 def comparison_database_path() -> Path:
     return Path(os.getenv("COMPARISON_DB_PATH", str(BASE_DIR / "retrochat.db")))
 
@@ -221,6 +236,24 @@ def get_shared_comparison(slug: str) -> SharedComparison:
 @app.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.post("/api/reality-check", response_model=RealityCheckResponse, dependencies=[Depends(enforce_limit)])
+async def reality_check(
+    request: RealityCheckRequest,
+    service: Annotated[GeminiChatService, Depends(get_chat_service)],
+) -> RealityCheckResponse:
+    try:
+        result = await asyncio.wait_for(
+            asyncio.to_thread(service.verify_historical_claims, request.question, request.retro),
+            timeout=timeout_seconds(),
+        )
+        return RealityCheckResponse(**result)
+    except TimeoutError as exc:
+        raise HTTPException(504, detail={"code": "upstream_timeout", "message": "Doğrulama süresi doldu. Tekrar dene."}) from exc
+    except Exception as exc:
+        log_service_failure(exc)
+        raise service_error(exc) from exc
 
 
 @app.get("/api/metrics")

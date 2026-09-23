@@ -24,6 +24,14 @@ class EraAwareChatService:
         return f"{era} bağlantısından: {message}"
 
 
+class RealityCheckService:
+    def verify_historical_claims(self, question, retro):
+        return {
+            "summary": f"Doğrulandı: {question} / {retro}",
+            "sources": [{"title": "Kaynak", "url": "https://example.com/history"}],
+        }
+
+
 class StreamingChatService:
     def stream_reply(self, message, history, era="1998"):
         yield "Merhaba "
@@ -151,6 +159,24 @@ def test_completed_comparison_gets_a_shareable_url_and_can_be_reopened(monkeypat
     }
     assert page.status_code == 200
     assert "RetroChat 98" in page.text
+
+
+def test_reality_check_returns_grounded_1998_summary_and_sources():
+    app.dependency_overrides[get_chat_service] = lambda: RealityCheckService()
+    try:
+        with TestClient(app) as client:
+            response = client.post("/api/reality-check", json={
+                "question": "İletişim nasıldı?",
+                "retro": "IRC kullanılıyordu.",
+            })
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "summary": "Doğrulandı: İletişim nasıldı? / IRC kullanılıyordu.",
+        "sources": [{"title": "Kaynak", "url": "https://example.com/history"}],
+    }
 
 
 def test_chat_endpoint_explains_temporary_model_capacity_errors():

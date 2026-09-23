@@ -253,6 +253,32 @@ def test_shared_comparison_url_opens_the_saved_result(page, server):
     assert page.locator("#compare-2058").get_by_text("Paylaşılan 2058 yanıtı", exact=True).is_visible()
 
 
+def test_reality_guide_separates_grounded_history_from_future_fiction(page, server):
+    page.set_default_timeout(3000)
+    page.route("**/api/chat/stream", lambda route: stream_response(route, f'{route.request.post_data_json["era"]} yanıtı'))
+    page.route(
+        "**/api/reality-check",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body=json.dumps({
+                "summary": "1998 iddiaları kaynaklarla karşılaştırıldı.",
+                "sources": [{"title": "İnternet tarihi", "url": "https://example.com/history"}],
+            }, ensure_ascii=False),
+        ),
+    )
+    page.goto(server)
+    page.locator("#compare-toggle").click()
+    page.locator("#compare-input").fill("İletişim nasıldı?")
+    page.locator('#compare-form button[type="submit"]').click()
+    page.get_by_role("button", name="Gerçeklik rehberini aç").click()
+
+    page.get_by_text("1998 iddiaları kaynaklarla karşılaştırıldı.", exact=True).wait_for()
+    assert page.get_by_text("Tarihsel iddia · kaynaklarla kontrol edildi", exact=True).is_visible()
+    assert page.get_by_text("2058 · yaratıcı kurgu, doğrulanmış öngörü değil", exact=True).is_visible()
+    assert page.get_by_role("link", name="İnternet tarihi").get_attribute("href") == "https://example.com/history"
+
+
 def test_share_falls_back_to_copy_when_native_share_is_missing(page, server):
     page.add_init_script("""window.copiedText = null;
       Object.defineProperty(navigator, 'share', {value: undefined, configurable: true});

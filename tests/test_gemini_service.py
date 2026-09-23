@@ -1,4 +1,5 @@
 import pytest
+from types import SimpleNamespace
 
 from app.gemini_service import GeminiChatService, MissingApiKeyError
 
@@ -93,6 +94,41 @@ def test_service_adopts_the_requested_2058_persona():
     result = service.reply("Hangi yıldayız?", [], era="2058")
 
     assert result == "2058 kanalından bağlandım."
+
+
+def test_historical_reality_check_uses_search_grounding_and_returns_sources():
+    class GroundedModels:
+        config = None
+
+        def generate_content(self, **kwargs):
+            self.config = kwargs["config"]
+            metadata = SimpleNamespace(grounding_chunks=[
+                SimpleNamespace(web=SimpleNamespace(uri="https://example.com/irc", title="IRC tarihi")),
+                SimpleNamespace(web=SimpleNamespace(uri="https://example.com/irc", title="IRC tarihi")),
+                SimpleNamespace(web=SimpleNamespace(uri="https://example.com/email", title="E-posta tarihi")),
+            ])
+            return SimpleNamespace(
+                text="IRC ve e-posta iddiaları tarihsel kayıtlarla uyumlu.",
+                candidates=[SimpleNamespace(grounding_metadata=metadata)],
+            )
+
+    class GroundedClient:
+        models = GroundedModels()
+
+    service = GeminiChatService(api_key="test-key", client=GroundedClient())
+    result = service.verify_historical_claims(
+        "İnsanlar nasıl iletişim kuruyordu?",
+        "IRC kanalları ve e-posta kullanıyorduk.",
+    )
+
+    assert GroundedClient.models.config.tools[0].google_search is not None
+    assert result == {
+        "summary": "IRC ve e-posta iddiaları tarihsel kayıtlarla uyumlu.",
+        "sources": [
+            {"title": "IRC tarihi", "url": "https://example.com/irc"},
+            {"title": "E-posta tarihi", "url": "https://example.com/email"},
+        ],
+    }
 
 
 def test_stream_continues_when_the_model_hits_its_token_limit():

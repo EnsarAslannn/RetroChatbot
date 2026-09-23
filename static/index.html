@@ -74,8 +74,24 @@
           <button id="copy-comparison" type="button" class="small-button">Metni kopyala</button>
           <button id="download-text" type="button" class="small-button">Metin indir</button>
           <button id="download-image" type="button" class="small-button">Görsel indir</button>
+          <button id="reality-check-open" type="button" class="small-button" aria-expanded="false" aria-controls="reality-guide">Gerçeklik rehberini aç</button>
           <span id="share-status" role="status" aria-live="polite"></span>
         </div>
+        <section id="reality-guide" class="reality-guide" aria-labelledby="reality-guide-title" hidden>
+          <h3 id="reality-guide-title">Gerçeklik rehberi</h3>
+          <div class="reality-grid">
+            <article>
+              <strong class="reality-label history-label">Tarihsel iddia · kaynaklarla kontrol edildi</strong>
+              <p id="reality-summary" role="status"></p>
+              <ul id="reality-sources" aria-label="Tarihsel kaynaklar"></ul>
+            </article>
+            <article>
+              <strong class="reality-label fiction-label">2058 · yaratıcı kurgu, doğrulanmış öngörü değil</strong>
+              <p>Bu bölüm olası bir geleceği hayal eder; gerçek olay, haber veya kesin tahmin olarak kullanılmamalıdır.</p>
+            </article>
+          </div>
+          <div id="reality-error" class="inline-error" role="alert" hidden></div>
+        </section>
         <div id="capsule-panel" class="capsule-panel" hidden>
           <button id="capsule-open" type="button" class="small-button">Zaman kapsülünü aç</button>
           <div id="capsule-result" role="status" hidden>

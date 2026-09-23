@@ -90,6 +90,40 @@ class GeminiChatService:
 
         return response.text.strip()
 
+    def verify_historical_claims(self, question: str, retro: str) -> dict:
+        prompt = (
+            "Aşağıdaki 1998 canlandırmasında geçen doğrulanabilir tarihsel iddiaları "
+            "Google Search ile kontrol et. En fazla üç önemli iddiayı kısa Türkçe bir "
+            "özetle değerlendir; doğrulanamayan veya yoruma dayalı kısımları açıkça belirt. "
+            "2058 hakkında yorum yapma.\n"
+            f"Soru: {question}\n1998 yanıtı: {retro}"
+        )
+        config = types.GenerateContentConfig(
+            temperature=0.2,
+            max_output_tokens=1200,
+            tools=[types.Tool(google_search=types.GoogleSearch())],
+        )
+        response = self.client.models.generate_content(
+            model=self.model,
+            contents=prompt,
+            config=config,
+        )
+        if not response.text or not response.text.strip():
+            raise RuntimeError("Gemini doğrulama için boş yanıt döndürdü.")
+
+        sources = []
+        seen_urls = set()
+        candidates = getattr(response, "candidates", None) or []
+        metadata = getattr(candidates[0], "grounding_metadata", None) if candidates else None
+        for chunk in getattr(metadata, "grounding_chunks", None) or []:
+            web = getattr(chunk, "web", None)
+            url = getattr(web, "uri", None)
+            if not web or not url or url in seen_urls:
+                continue
+            seen_urls.add(url)
+            sources.append({"title": getattr(web, "title", None) or url, "url": url})
+        return {"summary": response.text.strip(), "sources": sources[:6]}
+
     def stream_reply(self, message, history, era: str = "1998"):
         contents, _ = self._request_parts(message, history, era)
         emitted = False

@@ -17,6 +17,7 @@ Demo medyası `scripts/capture_demo.py` ile örnek yanıtlar kullanılarak üret
 
 - 1998 ve 2058 kişilikleri arasında geçiş; her dönemin sohbeti ayrı tutulur.
 - Aynı sorunun iki dönemdeki yanıtını eş zamanlı karşılaştırma.
+- İsteğe bağlı gerçeklik rehberi: 1998 yanıtındaki doğrulanabilir iddiaları Google Search grounding ile kaynaklara karşı kontrol etme ve 2058 bölümünü açıkça yaratıcı kurgu olarak ayırma.
 - Karşılaştırmada konu seçimi ve iki yanıt tamamlanınca 1998–2058 arasındaki üç kurgusal dönüm noktasını anlatan zaman kapsülü.
 - Tamamlanan karşılaştırmaları bu cihazda saklayan ve daha sonra yeniden açan karşılaştırma geçmişi.
 - Karşılaştırmadaki soru ve yanıtı bağlam olarak koruyup 1998 ya da 2058 sohbetinde devam etme.
@@ -57,12 +58,15 @@ flowchart LR
   B -->|Paylaşılabilir karşılaştırma| S[(SQLite)]
   A --> R[İstek sınırı ve zaman aşımı]
   R --> G[Gemini API]
+  A -->|İsteğe bağlı tarihsel doğrulama| GS[Google Search grounding]
   A --> M[Toplu sayaçlar /api/metrics]
 ```
 
 `/api/chat/stream` Server-Sent Events biçiminde `chunk`, `done` ve `error` olayları döndürür. Karşılaştırma iki ayrı istek gönderir; sohbet geçmişini değiştirmez. `/api/chat` önceki JSON sözleşmesi için korunmuştur. `GET /api/health` temel canlılık kontrolüdür.
 
 `POST /api/comparisons` yalnızca tamamlanan karşılaştırmanın sorusunu ve iki yanıtını SQLite içinde süreli olarak saklar; sohbet geçmişi paylaşılmaz. Dönen `/c/{kimlik}` bağlantısı aynı karşılaştırmayı yeniden açar. Varsayılan süre yedi gündür.
+
+`POST /api/reality-check`, kullanıcı **Gerçeklik rehberini aç** düğmesine bastığında 1998 yanıtını Google Search grounding ile kontrol eder ve sağlayıcının döndürdüğü kaynak bağlantılarını gösterir. Bu çağrı ek model/arama maliyeti doğurabilir; otomatik çalıştırılmaz. 2058 yanıtı her zaman yaratıcı kurgu olarak etiketlenir.
 
 Hata yanıtlarında `detail.code` ve `detail.message` alanları bulunur. Kodlar: `not_configured`, `invalid_api_key`, `upstream_forbidden`, `upstream_unreachable`, `rate_limited`, `upstream_busy`, `upstream_timeout`, `upstream_error`. Akış başladıktan sonraki hatalar HTTP gövdesinde `event: error` olarak iletilir.
 Genel `upstream_error` yanıtı, tanı için yalnızca istisna türünü (`error_type`), oluştuğu dosya/işlev/satırı (`error_origin`) ve varsa sayısal sağlayıcı kodunu (`provider_code`) içerir; sağlayıcının ham hata metni veya anahtar yanıtlanmaz.
