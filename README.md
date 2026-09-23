@@ -19,6 +19,7 @@ Demo medyası `scripts/capture_demo.py` ile örnek yanıtlar kullanılarak üret
 - Aynı sorunun iki dönemdeki yanıtını eş zamanlı karşılaştırma.
 - İsteğe bağlı gerçeklik rehberi: 1998 yanıtındaki doğrulanabilir iddiaları Google Search grounding ile kaynaklara karşı kontrol etme ve 2058 bölümünü açıkça yaratıcı kurgu olarak ayırma.
 - Karşılaştırmada konu seçimi ve iki yanıt tamamlanınca 1998–2058 arasındaki üç kurgusal dönüm noktasını anlatan zaman kapsülü.
+- İnternet, dijital kültür ve gündelik yaşam için dörder soruluk konu yolculukları; adım adım ilerleme ve paket tamamlanınca iki dönemi içeren metin özeti.
 - Tamamlanan karşılaştırmaları bu cihazda saklayan ve daha sonra yeniden açan karşılaştırma geçmişi.
 - Karşılaştırmadaki soru ve yanıtı bağlam olarak koruyup 1998 ya da 2058 sohbetinde devam etme.
 - Tamamlanan karşılaştırma için yedi gün geçerli yeniden açılabilir bağlantı üretme; cihazın paylaşım menüsüyle paylaşma, destek yoksa bağlantı ve metni kopyalama, ayrıca metin veya PNG olarak indirme.

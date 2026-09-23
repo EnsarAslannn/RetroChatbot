@@ -279,6 +279,39 @@ def test_reality_guide_separates_grounded_history_from_future_fiction(page, serv
     assert page.get_by_role("link", name="İnternet tarihi").get_attribute("href") == "https://example.com/history"
 
 
+def test_topic_pack_tracks_four_comparisons_and_exports_a_summary(page, server):
+    page.set_default_timeout(5000)
+    page.route(
+        "**/api/chat/stream",
+        lambda route: stream_response(
+            route,
+            f'{route.request.post_data_json["era"]}: {route.request.post_data_json["message"]}',
+        ),
+    )
+    page.goto(server)
+    page.locator("#compare-toggle").click()
+    page.get_by_label("Konu paketi").select_option("internet")
+    questions = [
+        "İnternete nasıl bağlanılıyor?",
+        "İnsanlar çevrimiçi nasıl sohbet ediyor?",
+        "Web siteleri nasıl görünüyor?",
+        "İnternette güvenlik nasıl sağlanıyor?",
+    ]
+
+    for index, question in enumerate(questions, start=1):
+        page.locator("#topic-pack-questions").get_by_role("button", name=question, exact=True).click()
+        assert page.locator("#compare-input").input_value() == question
+        page.locator('#compare-form button[type="submit"]').click()
+        page.locator("#compare-2058").get_by_text(f"2058: {question}", exact=True).wait_for()
+        assert page.get_by_text(f"{index} / 4 tamamlandı", exact=True).is_visible()
+
+    with page.expect_download() as download:
+        page.get_by_role("button", name="Paket özetini indir").click()
+    exported = Path(download.value.path()).read_text(encoding="utf-8")
+    assert "İnternet yolculuğu" in exported
+    assert all(question in exported for question in questions)
+
+
 def test_share_falls_back_to_copy_when_native_share_is_missing(page, server):
     page.add_init_script("""window.copiedText = null;
       Object.defineProperty(navigator, 'share', {value: undefined, configurable: true});

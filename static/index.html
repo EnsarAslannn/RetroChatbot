@@ -52,6 +52,24 @@
         <p>2058 yanıtı yaratıcı bir gelecek kurgusudur; doğrulanmış bir öngörü değildir.</p>
         <form id="compare-form">
           <label for="compare-input">Karşılaştırmak istediğin soru</label>
+          <section class="topic-pack" aria-labelledby="topic-pack-title">
+            <div class="topic-pack-heading">
+              <div><h3 id="topic-pack-title">Konu yolculukları</h3><p>Dört soruyu iki dönemde tamamla, özetini indir.</p></div>
+              <label for="topic-pack-select">Konu paketi
+                <select id="topic-pack-select">
+                  <option value="">Paket seç</option>
+                  <option value="internet">İnternet yolculuğu</option>
+                  <option value="culture">Dijital kültür</option>
+                  <option value="daily">Gündelik yaşam</option>
+                </select>
+              </label>
+            </div>
+            <div id="topic-pack-content" hidden>
+              <p id="topic-pack-progress" role="status">0 / 4 tamamlandı</p>
+              <div id="topic-pack-questions" class="topic-pack-questions"></div>
+              <button id="topic-pack-download" type="button" class="small-button" hidden>Paket özetini indir</button>
+            </div>
+          </section>
           <div class="topic-list" aria-label="Konu seç">
             <button type="button" class="topic-chip" data-question="İnsanlar birbirleriyle nasıl iletişim kuruyor?">İletişim</button>
             <button type="button" class="topic-chip" data-question="İnsanlar nasıl eğitim alıyor?">Eğitim</button>

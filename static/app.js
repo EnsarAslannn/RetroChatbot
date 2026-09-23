@@ -7,6 +7,35 @@ let activeShareUrl = null;
 const storageKey = "retrochat-sessions-v1";
 const preferencesKey = "retrochat-reading-v1";
 const comparisonsKey = "retrochat-comparisons-v1";
+const topicPacks = {
+  internet: {
+    title: "İnternet yolculuğu",
+    questions: [
+      { id: "connection", text: "İnternete nasıl bağlanılıyor?" },
+      { id: "chat", text: "İnsanlar çevrimiçi nasıl sohbet ediyor?" },
+      { id: "web", text: "Web siteleri nasıl görünüyor?" },
+      { id: "safety", text: "İnternette güvenlik nasıl sağlanıyor?" }
+    ]
+  },
+  culture: {
+    title: "Dijital kültür",
+    questions: [
+      { id: "music", text: "İnsanlar müziği nasıl dinliyor?" },
+      { id: "games", text: "Video oyunları nasıl oynanıyor?" },
+      { id: "video", text: "Film ve videolar nasıl izleniyor?" },
+      { id: "community", text: "Çevrimiçi topluluklar nasıl kuruluyor?" }
+    ]
+  },
+  daily: {
+    title: "Gündelik yaşam",
+    questions: [
+      { id: "school", text: "İnsanlar nasıl eğitim alıyor?" },
+      { id: "work", text: "İş hayatı nasıl ilerliyor?" },
+      { id: "shopping", text: "Alışveriş nasıl yapılıyor?" },
+      { id: "travel", text: "Şehir içinde nasıl yolculuk ediliyor?" }
+    ]
+  }
+};
 function readComparisons() {
   try {
     const saved = JSON.parse(localStorage.getItem(comparisonsKey) || "[]");
@@ -20,6 +49,29 @@ function persistComparisons() {
   comparisons = comparisons.slice(0, 30);
   try { localStorage.setItem(comparisonsKey, JSON.stringify(comparisons)); }
   catch { statusText.textContent = "Karşılaştırma geçmişi kaydedilemedi"; }
+}
+function selectedTopicPack() {
+  const id = $("#topic-pack-select").value;
+  return id && topicPacks[id] ? { id, ...topicPacks[id] } : null;
+}
+function renderTopicPack() {
+  const pack = selectedTopicPack(), content = $("#topic-pack-content"), questionList = $("#topic-pack-questions");
+  questionList.replaceChildren();
+  if (!pack) { content.hidden = true; return; }
+  content.hidden = false;
+  const completed = new Map(
+    comparisons.filter((item) => item.packId === pack.id && item.packQuestionId)
+      .map((item) => [item.packQuestionId, item])
+  );
+  $("#topic-pack-progress").textContent = `${completed.size} / ${pack.questions.length} tamamlandı`;
+  for (const question of pack.questions) {
+    const button = document.createElement("button");
+    button.type = "button"; button.className = "small-button"; button.textContent = question.text;
+    button.disabled = completed.has(question.id);
+    button.addEventListener("click", () => { $("#compare-input").value = question.text; $("#compare-input").focus(); });
+    questionList.append(button);
+  }
+  $("#topic-pack-download").hidden = completed.size !== pack.questions.length;
 }
 function showComparisonActions(show) {
   $("#continue-1998").hidden = !show;
@@ -479,11 +531,24 @@ function continueComparison(selectedEra) {
 }
 $("#continue-1998").addEventListener("click", () => continueComparison("1998"));
 $("#continue-2058").addEventListener("click", () => continueComparison("2058"));
+$("#topic-pack-select").addEventListener("change", renderTopicPack);
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob), link = document.createElement("a");
   link.href = url; link.download = filename; document.body.append(link); link.click(); link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+$("#topic-pack-download").addEventListener("click", () => {
+  const pack = selectedTopicPack();
+  if (!pack) return;
+  const sections = pack.questions.map((question) => {
+    const comparison = comparisons.find((item) => item.packId === pack.id && item.packQuestionId === question.id);
+    if (!comparison) return "";
+    return `${question.text}\n\n1998 / RETROCHAT\n${comparison.retro}\n\n2058 / FUTURECHAT · GELECEK KURGUSU\n${comparison.future}`;
+  }).filter(Boolean);
+  if (sections.length !== pack.questions.length) return;
+  const text = `${pack.title}\nRetroChat 98 / FutureChat 2058 konu paketi\n\n${sections.join("\n\n---\n\n")}`;
+  downloadBlob(new Blob([text], { type: "text/plain;charset=utf-8" }), `retrochat-${pack.id}-paketi.txt`);
+});
 $("#export-json").addEventListener("click", () => {
   downloadBlob(new Blob([JSON.stringify(sessions, null, 2)], { type: "application/json;charset=utf-8" }), "retrochat-sohbetler.json");
 });
@@ -651,8 +716,15 @@ compareForm.addEventListener("submit", async (event) => {
       if (activeRequest === request) target.textContent = reply;
     }));
     if (activeRequest === request) {
-      completedComparison = { id: crypto.randomUUID(), question, retro: $("#compare-1998").textContent, future: $("#compare-2058").textContent, updated: Date.now() };
+      const pack = selectedTopicPack();
+      const packQuestion = pack?.questions.find((item) => item.text === question);
+      completedComparison = {
+        id: crypto.randomUUID(), question, retro: $("#compare-1998").textContent,
+        future: $("#compare-2058").textContent, updated: Date.now(),
+        ...(packQuestion ? { packId: pack.id, packQuestionId: packQuestion.id } : {})
+      };
       comparisons.unshift(completedComparison); persistComparisons(); renderComparisonHistory();
+      renderTopicPack();
       $("#share-actions").hidden = false;
       $("#capsule-panel").hidden = false;
       showComparisonActions(true);
@@ -673,6 +745,7 @@ compareForm.addEventListener("submit", async (event) => {
 applyPreferences();
 if (!activeId) newSession(); else render();
 renderComparisonHistory();
+renderTopicPack();
 sendEvent("page_view");
 
 async function loadSharedComparison() {
