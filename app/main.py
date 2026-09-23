@@ -197,6 +197,16 @@ def homepage() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html")
 
 
+@app.get("/manifest.webmanifest", include_in_schema=False)
+def pwa_manifest() -> FileResponse:
+    return FileResponse(STATIC_DIR / "manifest.webmanifest", media_type="application/manifest+json")
+
+
+@app.get("/service-worker.js", include_in_schema=False)
+def service_worker() -> FileResponse:
+    return FileResponse(STATIC_DIR / "service-worker.js", media_type="application/javascript")
+
+
 @app.get("/c/{slug}", include_in_schema=False)
 def shared_comparison_page(slug: str) -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html")

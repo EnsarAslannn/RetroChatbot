@@ -130,6 +130,18 @@ def test_homepage_is_served():
     assert "RetroChat 98" in response.text
 
 
+def test_pwa_manifest_and_root_scoped_service_worker_are_served():
+    with TestClient(app) as client:
+        manifest = client.get("/manifest.webmanifest")
+        service_worker = client.get("/service-worker.js")
+
+    assert manifest.status_code == 200
+    assert manifest.json()["name"] == "RetroChat 98 / FutureChat 2058"
+    assert {icon["sizes"] for icon in manifest.json()["icons"]} >= {"192x192", "512x512"}
+    assert service_worker.status_code == 200
+    assert service_worker.headers["content-type"].startswith("application/javascript")
+
+
 def test_completed_comparison_gets_a_shareable_url_and_can_be_reopened(monkeypatch):
     database = Path(f".test-comparisons-{uuid.uuid4().hex}.db")
     monkeypatch.setenv("COMPARISON_DB_PATH", str(database))

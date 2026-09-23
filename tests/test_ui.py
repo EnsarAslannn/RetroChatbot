@@ -538,6 +538,24 @@ def test_mobile_page_has_no_horizontal_overflow_or_script_error(page, server):
     assert not errors
 
 
+def test_saved_chat_can_be_read_after_the_app_goes_offline(page, server):
+    page.set_default_timeout(10000)
+    page.goto(server)
+    page.evaluate("""localStorage.setItem('retrochat-sessions-v1', JSON.stringify([{
+      id:'offline-chat', era:'1998', title:'Çevrimdışı sohbet', updated:1,
+      messages:[{role:'user', content:'Çevrimdışı soru'}, {role:'assistant', content:'Kayıtlı çevrimdışı yanıt'}]
+    }]));""")
+    page.reload()
+    page.evaluate("navigator.serviceWorker.ready")
+
+    page.context.set_offline(True)
+    try:
+        page.reload(wait_until="domcontentloaded")
+        assert page.get_by_text("Kayıtlı çevrimdışı yanıt", exact=True).is_visible()
+    finally:
+        page.context.set_offline(False)
+
+
 def test_product_events_have_names_but_no_chat_text(page, server):
     events = []
     page.route("**/api/events", lambda route: (events.append(route.request.post_data_json), route.fulfill(status=204)))
