@@ -34,6 +34,21 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 logger = logging.getLogger("retrochat")
 
 
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; "
+        "connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; "
+        "frame-ancestors 'none'; form-action 'self'"
+    )
+    return response
+
+
 class SlidingWindowLimiter:
     def __init__(self, limit: int, window_seconds: int):
         self.limit = limit
@@ -65,12 +80,19 @@ def record(result: str, started: float) -> None:
         metrics["requests"] += 1
         metrics[result] += 1
         metrics["total_latency_ms"] += elapsed_ms
+    increment_metrics({"requests": 1, result: 1, "total_latency_ms": elapsed_ms})
     logger.info("chat result=%s duration_ms=%s", result, elapsed_ms)
 
 
 def enforce_limit(request: Request) -> None:
     client = request.client.host if request.client else "unknown"
-    if not limiter.allow(client):
+    user = authenticated_user(request)
+    if user and not shared_rate_limit(f"user-daily:{user[0]}", int(os.getenv("USER_DAILY_CHAT_LIMIT", "200")), 86400):
+        raise HTTPException(
+            status_code=429,
+            detail={"code": "daily_quota_reached", "message": "Günlük sohbet kotana ulaştın. Yarın tekrar deneyebilirsin."},
+        )
+    if not shared_rate_limit(f"chat-ip:{client}", int(os.getenv("CHAT_RATE_LIMIT", "20")), 60):
         raise HTTPException(
             status_code=429,
             detail={"code": "rate_limited", "message": "Çok fazla istek gönderildi. Bir dakika sonra tekrar dene."},
@@ -79,7 +101,7 @@ def enforce_limit(request: Request) -> None:
 
 def enforce_event_limit(request: Request) -> None:
     client = request.client.host if request.client else "unknown"
-    if not event_limiter.allow(client):
+    if not shared_rate_limit(f"event-ip:{client}", 120, 60):
         raise HTTPException(429, detail={"code": "rate_limited", "message": "Çok fazla olay gönderildi."})
 
 
@@ -234,6 +256,15 @@ def comparison_connection() -> sqlite3.Connection:
         FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
         )"""
     )
+    connection.execute(
+        "CREATE TABLE IF NOT EXISTS metric_totals (name TEXT PRIMARY KEY, value INTEGER NOT NULL)"
+    )
+    connection.execute(
+        """CREATE TABLE IF NOT EXISTS rate_limits (
+        key TEXT NOT NULL, bucket_start INTEGER NOT NULL, count INTEGER NOT NULL,
+        PRIMARY KEY (key, bucket_start)
+        )"""
+    )
     return connection
 
 
@@ -247,6 +278,64 @@ def password_digest(password: str, salt: bytes) -> str:
 
 def session_hash(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def increment_metrics(values: dict[str, int]) -> None:
+    connection = comparison_connection()
+    try:
+        for name, value in values.items():
+            connection.execute(
+                """INSERT INTO metric_totals (name, value) VALUES (?, ?)
+                ON CONFLICT(name) DO UPDATE SET value = value + excluded.value""",
+                (name, value),
+            )
+        connection.commit()
+    finally:
+        connection.close()
+
+
+def read_metrics() -> Counter:
+    connection = comparison_connection()
+    try:
+        rows = connection.execute("SELECT name, value FROM metric_totals").fetchall()
+    finally:
+        connection.close()
+    return Counter({name: value for name, value in rows})
+
+
+def shared_rate_limit(key: str, limit: int, window_seconds: int) -> bool:
+    redis_url = os.getenv("REDIS_URL", "").strip()
+    bucket = int(time.time()) // window_seconds
+    if redis_url:
+        try:
+            import redis
+            client = redis.Redis.from_url(redis_url, decode_responses=True)
+            redis_key = f"retrochat:limit:{key}:{bucket}"
+            with client.pipeline() as pipeline:
+                pipeline.incr(redis_key)
+                pipeline.expire(redis_key, window_seconds + 5)
+                count, _ = pipeline.execute()
+            return int(count) <= limit
+        except Exception as exc:
+            logger.error("redis rate limit unavailable type=%s", type(exc).__name__)
+
+    bucket_start = bucket * window_seconds
+    connection = comparison_connection()
+    try:
+        connection.execute(
+            """INSERT INTO rate_limits (key, bucket_start, count) VALUES (?, ?, 1)
+            ON CONFLICT(key, bucket_start) DO UPDATE SET count = count + 1""",
+            (key, bucket_start),
+        )
+        count = connection.execute(
+            "SELECT count FROM rate_limits WHERE key = ? AND bucket_start = ?",
+            (key, bucket_start),
+        ).fetchone()[0]
+        connection.execute("DELETE FROM rate_limits WHERE bucket_start < ?", (bucket_start - 172800,))
+        connection.commit()
+        return int(count) <= limit
+    finally:
+        connection.close()
 
 
 def secure_cookie_enabled() -> bool:
@@ -269,10 +358,10 @@ def create_auth_session(connection: sqlite3.Connection, user_id: int) -> str:
     return token
 
 
-def require_user(request: Request) -> tuple[int, str]:
+def authenticated_user(request: Request) -> tuple[int, str] | None:
     token = request.cookies.get(AUTH_COOKIE)
     if not token:
-        raise HTTPException(401, detail={"code": "authentication_required", "message": "Eşitlemek için giriş yap."})
+        return None
     connection = comparison_connection()
     try:
         row = connection.execute(
@@ -283,9 +372,21 @@ def require_user(request: Request) -> tuple[int, str]:
         ).fetchone()
     finally:
         connection.close()
-    if row is None:
+    return (int(row[0]), str(row[1])) if row else None
+
+
+def require_user(request: Request) -> tuple[int, str]:
+    user = authenticated_user(request)
+    if user is None:
         raise HTTPException(401, detail={"code": "authentication_required", "message": "Oturumun sona erdi. Yeniden giriş yap."})
-    return int(row[0]), str(row[1])
+    return user
+
+
+def require_metrics_token(request: Request) -> None:
+    configured = os.getenv("METRICS_TOKEN", "").strip()
+    supplied = request.headers.get("Authorization", "")
+    if not configured or not supplied.startswith("Bearer ") or not secrets.compare_digest(supplied[7:], configured):
+        raise HTTPException(401, detail={"code": "metrics_unauthorized", "message": "Ölçümler için geçerli erişim belirteci gerekli."})
 
 
 def get_chat_service(request: ChatRequest) -> GeminiChatService:
@@ -456,32 +557,33 @@ async def reality_check(
         raise service_error(exc) from exc
 
 
-@app.get("/api/metrics")
+@app.get("/api/metrics", dependencies=[Depends(require_metrics_token)])
 def public_metrics() -> dict[str, int | float]:
-    with metrics_lock:
-        requests = metrics["requests"]
-        return {
-            "requests": requests,
-            "successes": metrics["success"],
-            "errors": metrics["error"],
-            "timeouts": metrics["timeout"],
-            "average_latency_ms": round(metrics["total_latency_ms"] / requests) if requests else 0,
-            "page_views": metrics["page_view"],
-            "chat_starts": metrics["chat_started"],
-            "retries": metrics["retry"],
-            "comparisons": metrics["comparison_started"],
-            "feedback_period_fit": metrics["feedback_period_fit"],
-            "feedback_incomplete": metrics["feedback_incomplete"],
-            "feedback_repetitive": metrics["feedback_repetitive"],
-            "chat_start_rate": round(metrics["chat_started"] / metrics["page_view"], 3) if metrics["page_view"] else 0,
-            "retry_rate": round(metrics["retry"] / requests, 3) if requests else 0,
-        }
+    totals = read_metrics()
+    requests = totals["requests"]
+    return {
+        "requests": requests,
+        "successes": totals["success"],
+        "errors": totals["error"],
+        "timeouts": totals["timeout"],
+        "average_latency_ms": round(totals["total_latency_ms"] / requests) if requests else 0,
+        "page_views": totals["page_view"],
+        "chat_starts": totals["chat_started"],
+        "retries": totals["retry"],
+        "comparisons": totals["comparison_started"],
+        "feedback_period_fit": totals["feedback_period_fit"],
+        "feedback_incomplete": totals["feedback_incomplete"],
+        "feedback_repetitive": totals["feedback_repetitive"],
+        "chat_start_rate": round(totals["chat_started"] / totals["page_view"], 3) if totals["page_view"] else 0,
+        "retry_rate": round(totals["retry"] / requests, 3) if requests else 0,
+    }
 
 
 @app.post("/api/events", status_code=204, dependencies=[Depends(enforce_event_limit)])
 def product_event(item: ProductEvent) -> None:
     with metrics_lock:
         metrics[item.event] += 1
+    increment_metrics({item.event: 1})
 
 
 @app.post("/api/chat", response_model=ChatResponse, dependencies=[Depends(enforce_limit)])

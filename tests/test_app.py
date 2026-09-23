@@ -1,10 +1,19 @@
 from fastapi.testclient import TestClient
 from httpx import ConnectError
 from pathlib import Path
+import pytest
 import time
 import uuid
 
-from app.main import app, get_chat_service, SlidingWindowLimiter
+from app.main import app, get_chat_service, SlidingWindowLimiter, metrics
+
+
+@pytest.fixture(autouse=True)
+def isolated_application_database(monkeypatch):
+    database = Path(f".test-app-{uuid.uuid4().hex}.db")
+    monkeypatch.setenv("COMPARISON_DB_PATH", str(database))
+    yield
+    database.unlink(missing_ok=True)
 
 
 class FakeChatService:
@@ -140,6 +149,16 @@ def test_pwa_manifest_and_root_scoped_service_worker_are_served():
     assert {icon["sizes"] for icon in manifest.json()["icons"]} >= {"192x192", "512x512"}
     assert service_worker.status_code == 200
     assert service_worker.headers["content-type"].startswith("application/javascript")
+
+
+def test_browser_responses_include_baseline_security_headers():
+    with TestClient(app) as client:
+        response = client.get("/")
+
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert "default-src 'self'" in response.headers["content-security-policy"]
+    assert response.headers["referrer-policy"] == "no-referrer"
 
 
 def test_completed_comparison_gets_a_shareable_url_and_can_be_reopened(monkeypatch):
@@ -314,12 +333,51 @@ def test_chat_timeout_returns_a_machine_readable_code(monkeypatch):
     assert response.json()["detail"]["code"] == "upstream_timeout"
 
 
-def test_public_metrics_have_counts_without_message_content():
+def test_metrics_require_a_bearer_token_and_never_include_message_content(monkeypatch):
+    monkeypatch.setenv("METRICS_TOKEN", "test-metrics-token")
     with TestClient(app) as client:
-        response = client.get("/api/metrics")
+        unauthorized = client.get("/api/metrics")
+        response = client.get("/api/metrics", headers={"Authorization": "Bearer test-metrics-token"})
+    assert unauthorized.status_code == 401
     assert response.status_code == 200
     assert "requests" in response.json()
     assert "message" not in response.text
+
+
+def test_signed_in_user_has_a_daily_chat_quota(monkeypatch):
+    database = Path(f".test-quota-{uuid.uuid4().hex}.db")
+    monkeypatch.setenv("COMPARISON_DB_PATH", str(database))
+    monkeypatch.setenv("USER_DAILY_CHAT_LIMIT", "1")
+    app.dependency_overrides[get_chat_service] = lambda: FakeChatService()
+    try:
+        with TestClient(app) as client:
+            client.post("/api/auth/register", json={"username": "kotali", "password": "guclu-kota-parolasi"})
+            first = client.post("/api/chat", json={"message": "İlk soru"})
+            second = client.post("/api/chat", json={"message": "İkinci soru"})
+    finally:
+        app.dependency_overrides.clear()
+        database.unlink(missing_ok=True)
+
+    assert first.status_code == 200
+    assert second.status_code == 429
+    assert second.json()["detail"]["code"] == "daily_quota_reached"
+
+
+def test_metrics_survive_in_memory_counter_loss(monkeypatch):
+    database = Path(f".test-metrics-{uuid.uuid4().hex}.db")
+    monkeypatch.setenv("COMPARISON_DB_PATH", str(database))
+    monkeypatch.setenv("METRICS_TOKEN", "persistent-token")
+    metrics.clear()
+    try:
+        with TestClient(app) as client:
+            client.post("/api/events", json={"event": "retry"})
+            metrics.clear()
+            response = client.get("/api/metrics", headers={"Authorization": "Bearer persistent-token"})
+    finally:
+        database.unlink(missing_ok=True)
+
+    assert response.status_code == 200
+    assert response.json()["retries"] == 1
 
 
 def test_rate_limit_is_scoped_to_each_client():
@@ -414,22 +472,26 @@ def test_missing_api_key_uses_structured_error(monkeypatch):
     assert response.json()["detail"]["code"] == "not_configured"
 
 
-def test_product_events_count_without_accepting_message_content():
+def test_product_events_count_without_accepting_message_content(monkeypatch):
+    monkeypatch.setenv("METRICS_TOKEN", "test-metrics-token")
+    headers = {"Authorization": "Bearer test-metrics-token"}
     with TestClient(app) as client:
-        before = client.get("/api/metrics").json()["retries"]
+        before = client.get("/api/metrics", headers=headers).json()["retries"]
         response = client.post("/api/events", json={"event": "retry"})
-        after = client.get("/api/metrics").json()["retries"]
+        after = client.get("/api/metrics", headers=headers).json()["retries"]
         unsafe = client.post("/api/events", json={"event": "retry", "message": "özel soru"})
     assert response.status_code == 204
     assert after == before + 1
     assert unsafe.status_code == 422
 
 
-def test_feedback_event_counts_without_accepting_chat_text():
+def test_feedback_event_counts_without_accepting_chat_text(monkeypatch):
+    monkeypatch.setenv("METRICS_TOKEN", "test-metrics-token")
+    headers = {"Authorization": "Bearer test-metrics-token"}
     with TestClient(app) as client:
-        before = client.get("/api/metrics").json()["feedback_incomplete"]
+        before = client.get("/api/metrics", headers=headers).json()["feedback_incomplete"]
         response = client.post("/api/events", json={"event": "feedback_incomplete"})
-        after = client.get("/api/metrics").json()["feedback_incomplete"]
+        after = client.get("/api/metrics", headers=headers).json()["feedback_incomplete"]
         unsafe = client.post("/api/events", json={"event": "feedback_incomplete", "message": "özel soru"})
     assert response.status_code == 204
     assert after == before + 1

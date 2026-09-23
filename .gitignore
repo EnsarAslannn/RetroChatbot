@@ -48,4 +48,8 @@ retrochat.db-wal
 .test-comparisons-*.db
 .test-accounts-*.db
 .test-sync-*.db
+.test-quota-*.db
+.test-metrics-*.db
+.test-app-*.db
+.test-ui-*.db
 .tmp/

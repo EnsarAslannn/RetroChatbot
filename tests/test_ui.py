@@ -1,7 +1,9 @@
 import json
+import os
 import socket
 import subprocess
 import time
+import uuid
 from pathlib import Path
 
 import pytest
@@ -10,10 +12,14 @@ from playwright.sync_api import sync_playwright
 
 @pytest.fixture(scope="module")
 def server():
+    database = Path(f".test-ui-{uuid.uuid4().hex}.db")
+    environment = os.environ.copy()
+    environment["COMPARISON_DB_PATH"] = str(database)
     process = subprocess.Popen(
         [".venv/Scripts/python.exe", "-m", "uvicorn", "app.main:app", "--port", "8765"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
+        env=environment,
     )
     for _ in range(50):
         try:
@@ -27,6 +33,7 @@ def server():
     yield "http://127.0.0.1:8765"
     process.terminate()
     process.wait(timeout=5)
+    database.unlink(missing_ok=True)
 
 
 @pytest.fixture
@@ -197,7 +204,7 @@ def test_completed_comparison_can_be_shared_or_downloaded(page, server):
     page.locator('#compare-form button[type="submit"]').click()
     page.get_by_role("button", name="Paylaş").wait_for(state="visible")
     page.get_by_role("button", name="Paylaş").click()
-    page.wait_for_function("window.sharedData !== null")
+    page.locator("#share-status").get_by_text("Paylaşım açıldı.", exact=True).wait_for()
     shared = page.evaluate("window.sharedData")
     assert "Nasıl iletişim kuracağız?" in shared["text"]
     assert "1998 yanıtı" in shared["text"]
@@ -225,7 +232,7 @@ def test_share_creates_a_reopenable_link(page, server):
     page.locator('#compare-form button[type="submit"]').click()
     page.get_by_role("button", name="Paylaş").click()
 
-    page.wait_for_function("window.sharedData !== null")
+    page.locator("#share-status").get_by_text("Paylaşım açıldı.", exact=True).wait_for()
     shared = page.evaluate("window.sharedData")
     assert shared["url"] == f"{server}/c/paylas123"
     assert "İletişim nasıl değişecek?" in shared["text"]
@@ -323,7 +330,7 @@ def test_share_falls_back_to_copy_when_native_share_is_missing(page, server):
     page.locator("#compare-input").fill("Örnek soru")
     page.locator('#compare-form button[type="submit"]').click()
     page.get_by_role("button", name="Paylaş").click()
-    page.wait_for_function("window.copiedText !== null")
+    page.locator("#share-status").get_by_text("Karşılaştırma kopyalandı.", exact=True).wait_for()
     assert "Örnek soru" in page.evaluate("window.copiedText")
     assert page.locator("#share-status").get_by_text("Karşılaştırma kopyalandı.").is_visible()
 
