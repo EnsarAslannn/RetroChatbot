@@ -3,6 +3,7 @@ const input = $("#message-input"), chatLog = $("#chat-log"), statusText = $("#st
 const typing = $("#typing"), cancelButton = $("#cancel-button"), announcement = $("#announcement");
 const chatError = $("#chat-error"), comparePanel = $("#compare-panel"), compareResults = $("#compare-results");
 let completedComparison = null;
+let activeShareUrl = null;
 const storageKey = "retrochat-sessions-v1";
 const preferencesKey = "retrochat-reading-v1";
 const comparisonsKey = "retrochat-comparisons-v1";
@@ -26,6 +27,7 @@ function showComparisonActions(show) {
 }
 function openComparison(comparison) {
   completedComparison = comparison;
+  activeShareUrl = null;
   $("#compare-input").value = comparison.question;
   $("#compare-1998").textContent = comparison.retro;
   $("#compare-2058").textContent = comparison.future;
@@ -503,18 +505,38 @@ $("#export-text").addEventListener("click", () => {
   downloadBlob(new Blob([text], { type: "text/plain;charset=utf-8" }), "retrochat-sohbetler.txt");
 });
 async function copyComparison() {
-  try { await navigator.clipboard.writeText(comparisonText()); $("#share-status").textContent = "Karşılaştırma kopyalandı."; }
+  const text = activeShareUrl ? `${comparisonText()}\n\n${activeShareUrl}` : comparisonText();
+  try { await navigator.clipboard.writeText(text); $("#share-status").textContent = "Karşılaştırma kopyalandı."; }
   catch { $("#share-status").textContent = "Kopyalanamadı. Metin indir seçeneğini kullan."; }
+}
+async function createShareUrl() {
+  if (activeShareUrl) return activeShareUrl;
+  const response = await fetch("/api/comparisons", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      question: completedComparison.question,
+      retro: completedComparison.retro,
+      future: completedComparison.future,
+      expires_in_days: 7
+    })
+  });
+  if (!response.ok) throw new Error("Paylaşım bağlantısı oluşturulamadı.");
+  const data = await response.json();
+  activeShareUrl = new URL(data.share_path, window.location.origin).href;
+  return activeShareUrl;
 }
 $("#share-comparison").addEventListener("click", async () => {
   if (!completedComparison) return;
-  if (!navigator.share) { await copyComparison(); return; }
+  const shareButton = $("#share-comparison");
+  shareButton.disabled = true; $("#share-status").textContent = "Bağlantı hazırlanıyor...";
   try {
-    await navigator.share({ title: "RetroChat karşılaştırması", text: comparisonText() });
+    const url = await createShareUrl();
+    if (!navigator.share) { await copyComparison(); return; }
+    await navigator.share({ title: "RetroChat karşılaştırması", text: comparisonText(), url });
     $("#share-status").textContent = "Paylaşım açıldı.";
   } catch (error) {
-    if (error.name !== "AbortError") await copyComparison();
-  }
+    if (error.name !== "AbortError") $("#share-status").textContent = error.message;
+  } finally { shareButton.disabled = false; }
 });
 $("#copy-comparison").addEventListener("click", () => { if (completedComparison) copyComparison(); });
 $("#download-text").addEventListener("click", () => {
@@ -574,7 +596,7 @@ compareForm.addEventListener("submit", async (event) => {
   event.preventDefault(); const question = $("#compare-input").value.trim();
   if (!question || activeRequest) return;
   sendEvent("comparison_started");
-  completedComparison = null; $("#share-actions").hidden = true; $("#share-status").textContent = "";
+  completedComparison = null; activeShareUrl = null; $("#share-actions").hidden = true; $("#share-status").textContent = "";
   showComparisonActions(false);
   $("#capsule-panel").hidden = true; $("#capsule-result").hidden = true;
   $("#compare-error").hidden = true; compareResults.hidden = false;
@@ -613,3 +635,21 @@ applyPreferences();
 if (!activeId) newSession(); else render();
 renderComparisonHistory();
 sendEvent("page_view");
+
+async function loadSharedComparison() {
+  const match = window.location.pathname.match(/^\/c\/([A-Za-z0-9_-]+)$/);
+  if (!match) return;
+  comparePanel.hidden = false;
+  $("#compare-toggle").setAttribute("aria-expanded", "true");
+  $("#compare-error").hidden = false;
+  $("#compare-error").textContent = "Paylaşılan karşılaştırma yükleniyor...";
+  try {
+    const response = await fetch(`/api/comparisons/${match[1]}`);
+    if (!response.ok) throw new Error("Paylaşılan karşılaştırma bulunamadı veya süresi doldu.");
+    openComparison(await response.json());
+    activeShareUrl = window.location.href;
+    $("#compare-error").hidden = true;
+    announcement.textContent = "Paylaşılan karşılaştırma açıldı.";
+  } catch (error) { $("#compare-error").textContent = error.message; }
+}
+loadSharedComparison();

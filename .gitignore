@@ -40,3 +40,10 @@ Desktop.ini
 
 # Logs
 *.log
+
+# Local application data
+retrochat.db
+retrochat.db-shm
+retrochat.db-wal
+.test-comparisons-*.db
+.tmp/

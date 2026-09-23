@@ -1,6 +1,8 @@
 from fastapi.testclient import TestClient
 from httpx import ConnectError
+from pathlib import Path
 import time
+import uuid
 
 from app.main import app, get_chat_service, SlidingWindowLimiter
 
@@ -118,6 +120,37 @@ def test_homepage_is_served():
 
     assert response.status_code == 200
     assert "RetroChat 98" in response.text
+
+
+def test_completed_comparison_gets_a_shareable_url_and_can_be_reopened(monkeypatch):
+    database = Path(f".test-comparisons-{uuid.uuid4().hex}.db")
+    monkeypatch.setenv("COMPARISON_DB_PATH", str(database))
+    comparison = {
+        "question": "İnsanlar nasıl iletişim kuruyor?",
+        "retro": "1998'de IRC ve e-posta kullanılıyor.",
+        "future": "2058'de uzamsal arayüzler kullanılabilir.",
+        "expires_in_days": 7,
+    }
+
+    try:
+        with TestClient(app) as client:
+            created = client.post("/api/comparisons", json=comparison)
+            assert created.status_code == 201
+            share_path = created.json()["share_path"]
+            reopened = client.get(share_path.replace("/c/", "/api/comparisons/"))
+            page = client.get(share_path)
+    finally:
+        database.unlink(missing_ok=True)
+
+    assert share_path.startswith("/c/")
+    assert reopened.status_code == 200
+    assert reopened.json() == {
+        "question": comparison["question"],
+        "retro": comparison["retro"],
+        "future": comparison["future"],
+    }
+    assert page.status_code == 200
+    assert "RetroChat 98" in page.text
 
 
 def test_chat_endpoint_explains_temporary_model_capacity_errors():

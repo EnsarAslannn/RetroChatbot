@@ -197,6 +197,7 @@ def test_completed_comparison_can_be_shared_or_downloaded(page, server):
     page.locator('#compare-form button[type="submit"]').click()
     page.get_by_role("button", name="Paylaş").wait_for(state="visible")
     page.get_by_role("button", name="Paylaş").click()
+    page.wait_for_function("window.sharedData !== null")
     shared = page.evaluate("window.sharedData")
     assert "Nasıl iletişim kuracağız?" in shared["text"]
     assert "1998 yanıtı" in shared["text"]
@@ -211,6 +212,47 @@ def test_completed_comparison_can_be_shared_or_downloaded(page, server):
     assert Path(image_download.value.path()).read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
 
 
+def test_share_creates_a_reopenable_link(page, server):
+    page.add_init_script("""window.sharedData = null; navigator.share = async (data) => { window.sharedData = data; };""")
+    page.route("**/api/chat/stream", lambda route: stream_response(route, f'{route.request.post_data_json["era"]} yanıtı'))
+    page.route(
+        "**/api/comparisons",
+        lambda route: route.fulfill(status=201, content_type="application/json", body='{"share_path":"/c/paylas123"}'),
+    )
+    page.goto(server)
+    page.locator("#compare-toggle").click()
+    page.locator("#compare-input").fill("İletişim nasıl değişecek?")
+    page.locator('#compare-form button[type="submit"]').click()
+    page.get_by_role("button", name="Paylaş").click()
+
+    page.wait_for_function("window.sharedData !== null")
+    shared = page.evaluate("window.sharedData")
+    assert shared["url"] == f"{server}/c/paylas123"
+    assert "İletişim nasıl değişecek?" in shared["text"]
+
+
+def test_shared_comparison_url_opens_the_saved_result(page, server):
+    page.route(
+        "**/api/comparisons/paylas123",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body=json.dumps({
+                "question": "Paylaşılan soru",
+                "retro": "Paylaşılan 1998 yanıtı",
+                "future": "Paylaşılan 2058 yanıtı",
+            }, ensure_ascii=False),
+        ),
+    )
+    page.goto(f"{server}/c/paylas123")
+
+    page.locator("#compare-panel").wait_for(state="visible")
+    assert page.locator("#compare-panel").is_visible()
+    assert page.locator("#compare-input").input_value() == "Paylaşılan soru"
+    assert page.locator("#compare-1998").get_by_text("Paylaşılan 1998 yanıtı", exact=True).is_visible()
+    assert page.locator("#compare-2058").get_by_text("Paylaşılan 2058 yanıtı", exact=True).is_visible()
+
+
 def test_share_falls_back_to_copy_when_native_share_is_missing(page, server):
     page.add_init_script("""window.copiedText = null;
       Object.defineProperty(navigator, 'share', {value: undefined, configurable: true});
@@ -222,6 +264,7 @@ def test_share_falls_back_to_copy_when_native_share_is_missing(page, server):
     page.locator("#compare-input").fill("Örnek soru")
     page.locator('#compare-form button[type="submit"]').click()
     page.get_by_role("button", name="Paylaş").click()
+    page.wait_for_function("window.copiedText !== null")
     assert "Örnek soru" in page.evaluate("window.copiedText")
     assert page.locator("#share-status").get_by_text("Karşılaştırma kopyalandı.").is_visible()
 

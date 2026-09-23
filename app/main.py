@@ -3,6 +3,8 @@ import asyncio
 import json
 import logging
 import queue
+import secrets
+import sqlite3
 import threading
 import time
 import traceback
@@ -138,6 +140,36 @@ class ProductEvent(BaseModel):
     event: Literal["page_view", "chat_started", "retry", "comparison_started", "feedback_period_fit", "feedback_incomplete", "feedback_repetitive"]
 
 
+class SharedComparisonRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=2000)
+    retro: str = Field(min_length=1, max_length=20000)
+    future: str = Field(min_length=1, max_length=20000)
+    expires_in_days: Literal[7, 30] = 7
+
+
+class SharedComparison(BaseModel):
+    question: str
+    retro: str
+    future: str
+
+
+def comparison_database_path() -> Path:
+    return Path(os.getenv("COMPARISON_DB_PATH", str(BASE_DIR / "retrochat.db")))
+
+
+def comparison_connection() -> sqlite3.Connection:
+    database = comparison_database_path()
+    database.parent.mkdir(parents=True, exist_ok=True)
+    connection = sqlite3.connect(database)
+    connection.execute(
+        """CREATE TABLE IF NOT EXISTS shared_comparisons (
+        slug TEXT PRIMARY KEY, question TEXT NOT NULL, retro TEXT NOT NULL,
+        future TEXT NOT NULL, expires_at INTEGER NOT NULL
+        )"""
+    )
+    return connection
+
+
 def get_chat_service(request: ChatRequest) -> GeminiChatService:
     try:
         return GeminiChatService(api_key=os.getenv("GEMINI_API_KEY", ""))
@@ -148,6 +180,42 @@ def get_chat_service(request: ChatRequest) -> GeminiChatService:
 @app.get("/", include_in_schema=False)
 def homepage() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/c/{slug}", include_in_schema=False)
+def shared_comparison_page(slug: str) -> FileResponse:
+    return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.post("/api/comparisons", status_code=201)
+def create_shared_comparison(item: SharedComparisonRequest) -> dict[str, str]:
+    slug = secrets.token_urlsafe(9)
+    expires_at = int(time.time()) + item.expires_in_days * 86400
+    connection = comparison_connection()
+    try:
+        connection.execute(
+            "INSERT INTO shared_comparisons VALUES (?, ?, ?, ?, ?)",
+            (slug, item.question.strip(), item.retro.strip(), item.future.strip(), expires_at),
+        )
+        connection.commit()
+    finally:
+        connection.close()
+    return {"share_path": f"/c/{slug}"}
+
+
+@app.get("/api/comparisons/{slug}", response_model=SharedComparison)
+def get_shared_comparison(slug: str) -> SharedComparison:
+    connection = comparison_connection()
+    try:
+        row = connection.execute(
+            "SELECT question, retro, future FROM shared_comparisons WHERE slug = ? AND expires_at > ?",
+            (slug, int(time.time())),
+        ).fetchone()
+    finally:
+        connection.close()
+    if row is None:
+        raise HTTPException(404, detail={"code": "comparison_not_found", "message": "Paylaşılan karşılaştırma bulunamadı veya süresi doldu."})
+    return SharedComparison(question=row[0], retro=row[1], future=row[2])
 
 
 @app.get("/api/health")
