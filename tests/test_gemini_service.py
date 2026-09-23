@@ -131,6 +131,34 @@ def test_historical_reality_check_uses_search_grounding_and_returns_sources():
     }
 
 
+@pytest.mark.parametrize(
+    ("era", "prompt", "response", "expected_issue"),
+    [
+        ("1998", "TikTok'ta nasıl video paylaşırım?", "TikTok'ta paylaş düğmesine bas.", "post_1998_certainty"),
+        ("2058", "2058'te ulaşım nasıl?", "Uçan taksiler kesin olarak her şehirde olacak.", "future_certainty"),
+        ("1998", "Kısa anlat", "kelime " * 181, "too_long"),
+    ],
+)
+def test_persona_evaluation_flags_contract_violations(era, prompt, response, expected_issue):
+    result = GeminiChatService.evaluate_persona_response(era, prompt, response)
+
+    assert not result["passed"]
+    assert expected_issue in result["issues"]
+
+
+@pytest.mark.parametrize(
+    ("era", "prompt", "response"),
+    [
+        ("1998", "TikTok nedir?", "Bunu bilmiyorum; geleceğe ait bir fikir ya da tahmin olabilir."),
+        ("2058", "2058'te ulaşım nasıl?", "Yaratıcı bir gelecek kurgusunda otonom araçlar yaygın olabilir."),
+    ],
+)
+def test_persona_evaluation_accepts_period_aware_uncertainty(era, prompt, response):
+    result = GeminiChatService.evaluate_persona_response(era, prompt, response)
+
+    assert result == {"passed": True, "issues": []}
+
+
 def test_stream_continues_when_the_model_hits_its_token_limit():
     class TruncatedModels:
         calls = 0

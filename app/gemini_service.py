@@ -124,6 +124,31 @@ class GeminiChatService:
             sources.append({"title": getattr(web, "title", None) or url, "url": url})
         return {"summary": response.text.strip(), "sources": sources[:6]}
 
+    @staticmethod
+    def evaluate_persona_response(era: str, prompt: str, response: str) -> dict:
+        prompt_lower = prompt.casefold()
+        response_lower = response.casefold()
+        issues = []
+        if len(response.split()) > 180:
+            issues.append("too_long")
+
+        uncertainty = ("bilmiyorum", "gelecek", "tahmin", "kurgu", "olabilir", "olasılık", "hayal")
+        post_1998_markers = (
+            "tiktok", "instagram", "youtube", "facebook", "iphone", "android",
+            "bitcoin", "chatgpt", "covid", "spotify", "netflix",
+        )
+        if era == "1998" and any(marker in prompt_lower for marker in post_1998_markers):
+            if not any(marker in response_lower for marker in uncertainty):
+                issues.append("post_1998_certainty")
+
+        certainty = ("kesin", "mutlaka", "garanti", "şüphesiz", "olacak")
+        future_context = ("kurgu", "tahmin", "olabilir", "olasılık", "hayal", "muhtemel")
+        if era == "2058" and any(marker in response_lower for marker in certainty):
+            if not any(marker in response_lower for marker in future_context):
+                issues.append("future_certainty")
+
+        return {"passed": not issues, "issues": issues}
+
     def stream_reply(self, message, history, era: str = "1998"):
         contents, _ = self._request_parts(message, history, era)
         emitted = False

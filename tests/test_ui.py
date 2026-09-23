@@ -2,6 +2,7 @@ import json
 import os
 import socket
 import subprocess
+import sys
 import time
 import uuid
 from pathlib import Path
@@ -16,7 +17,7 @@ def server():
     environment = os.environ.copy()
     environment["COMPARISON_DB_PATH"] = str(database)
     process = subprocess.Popen(
-        [".venv/Scripts/python.exe", "-m", "uvicorn", "app.main:app", "--port", "8765"],
+        [sys.executable, "-m", "uvicorn", "app.main:app", "--port", "8765"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         env=environment,

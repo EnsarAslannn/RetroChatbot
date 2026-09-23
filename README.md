@@ -104,3 +104,11 @@ python scripts/capture_demo.py
 ```
 
 Tarayıcı testleri Chromium gerektirir; gerekirse `python -m playwright install chromium` çalıştırın. Demo videosunu yeniden üretmek için FFmpeg gerekir. API ve model hizmeti testleri dış API'ye bağlanmaz; tarayıcı testleri akış yanıtlarını kontrollü olarak taklit eder.
+
+GitHub Actions, `main` pushlarında ve pull request'lerde API/model testleriyle Chromium kullanıcı akışlarını Windows üzerinde çalıştırır. Canlı persona değerlendirmesi için depoya `GEMINI_API_KEY` Actions secret'ı ekleyip **CI → Run workflow** kullanın veya yerelde şunu çalıştırın:
+
+```powershell
+python scripts/evaluate_personas.py
+```
+
+Komut; 1998 kişiliğinin 1999 sonrası ürünleri kesin bilgi gibi onaylamasını, 2058 kurgusunun kesin gelecek gibi sunulmasını ve gereksiz uzun yanıtları başarısız sayar. Çıktı JSON'dur ve ihlalde sıfırdan farklı kodla kapanır.
