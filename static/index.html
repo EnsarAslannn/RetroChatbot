@@ -138,6 +138,27 @@
           </div>
           <input id="import-json-input" class="sr-only" type="file" accept="application/json,.json" tabindex="-1">
           <p id="import-status" class="import-status" role="status" aria-live="polite"></p>
+          <details class="account-panel">
+            <summary>Cihazlar arası eşitle</summary>
+            <div id="account-anonymous">
+              <label for="account-username">Kullanıcı adı</label>
+              <input id="account-username" autocomplete="username" minlength="3" maxlength="32">
+              <label for="account-password">Parola</label>
+              <input id="account-password" type="password" autocomplete="current-password" minlength="10" maxlength="128">
+              <div class="account-actions">
+                <button id="account-register" type="button" class="small-button">Hesap oluştur</button>
+                <button id="account-login" type="button" class="small-button">Giriş yap</button>
+              </div>
+            </div>
+            <div id="account-signed-in" hidden>
+              <p><strong id="account-name"></strong> olarak bağlısın.</p>
+              <div class="account-actions">
+                <button id="account-sync" type="button" class="small-button">Şimdi eşitle</button>
+                <button id="account-logout" type="button" class="small-button">Çıkış yap</button>
+              </div>
+            </div>
+            <p id="account-status" role="status" aria-live="polite"></p>
+          </details>
           <fieldset class="reading-settings">
             <legend>Okuma ayarları</legend>
             <label for="text-size">Yazı boyutu</label>

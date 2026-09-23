@@ -31,6 +31,7 @@ Demo medyası `scripts/capture_demo.py` ile örnek yanıtlar kullanılarak üret
 - Örnek sorular, mobil düzen, klavye kullanımı, ekran okuyucu duyuruları ve azaltılmış hareket desteği.
 - Bu cihazda saklanan okuma tercihleri: yazı boyutu, hareketi azaltma ve uzun yanıtları okunabilir parçalara ayırma.
 - PWA olarak ana ekrana kurulma; uygulama kabuğunu ve bu cihazdaki kayıtlı sohbetleri çevrimdışıyken yeniden açma.
+- Hesap açmadan yerel kullanıma devam etme; isteğe bağlı kullanıcı adı/parola hesabıyla en fazla 30 sohbeti cihazlar arasında açıkça tetiklenen birleştirme akışıyla eşitleme.
 - Sunucuda istek sınırı, zaman aşımı, kodlu hatalar ve mesaj içeriği toplamayan ölçümler.
 - Model token sınırına ulaşırsa yanıtı devam ettirme; tamamlanamayan yanıtı bitmiş gibi kaydetmeme.
 
@@ -58,6 +59,7 @@ flowchart LR
   B[Tarayıcı: HTML/CSS/JS] -->|POST /api/chat/stream| A[FastAPI]
   B --> L[(Tarayıcı localStorage)]
   B -->|Paylaşılabilir karşılaştırma| S[(SQLite)]
+  B -->|İsteğe bağlı hesap / sohbet eşitleme| S
   A --> R[İstek sınırı ve zaman aşımı]
   R --> G[Gemini API]
   A -->|İsteğe bağlı tarihsel doğrulama| GS[Google Search grounding]
@@ -69,6 +71,8 @@ flowchart LR
 `POST /api/comparisons` yalnızca tamamlanan karşılaştırmanın sorusunu ve iki yanıtını SQLite içinde süreli olarak saklar; sohbet geçmişi paylaşılmaz. Dönen `/c/{kimlik}` bağlantısı aynı karşılaştırmayı yeniden açar. Varsayılan süre yedi gündür.
 
 `POST /api/reality-check`, kullanıcı **Gerçeklik rehberini aç** düğmesine bastığında 1998 yanıtını Google Search grounding ile kontrol eder ve sağlayıcının döndürdüğü kaynak bağlantılarını gösterir. Bu çağrı ek model/arama maliyeti doğurabilir; otomatik çalıştırılmaz. 2058 yanıtı her zaman yaratıcı kurgu olarak etiketlenir.
+
+Hesap özelliği isteğe bağlıdır. Parolalar benzersiz tuzla `scrypt` kullanılarak türetilmiş özet biçiminde saklanır; oturum belirteci `HttpOnly`, `SameSite=Lax` çerezindedir. Eşitleme giriş/kayıt sonrasında veya **Şimdi eşitle** düğmesiyle çalışır, aynı kimlikli sohbetlerde en yeni `updated` değerini korur. Çıkış yapmak cihazdaki yerel sohbetleri silmez.
 
 Hata yanıtlarında `detail.code` ve `detail.message` alanları bulunur. Kodlar: `not_configured`, `invalid_api_key`, `upstream_forbidden`, `upstream_unreachable`, `rate_limited`, `upstream_busy`, `upstream_timeout`, `upstream_error`. Akış başladıktan sonraki hatalar HTTP gövdesinde `event: error` olarak iletilir.
 Genel `upstream_error` yanıtı, tanı için yalnızca istisna türünü (`error_type`), oluştuğu dosya/işlev/satırı (`error_origin`) ve varsa sayısal sağlayıcı kodunu (`provider_code`) içerir; sağlayıcının ham hata metni veya anahtar yanıtlanmaz.
@@ -85,8 +89,9 @@ Genel `upstream_error` yanıtı, tanı için yalnızca istisna türünü (`error
 | `CHAT_RATE_LIMIT` | IP başına dakikalık sohbet isteği | `20` |
 | `CHAT_TIMEOUT_SECONDS` | Yanıt için üst süre | `30` |
 | `COMPARISON_DB_PATH` | Süreli paylaşım bağlantılarının SQLite dosyası | `retrochat.db` |
+| `AUTH_COOKIE_SECURE` | Oturum çerezini yalnızca HTTPS üzerinden gönder | `false` |
 
-Üretimde HTTPS arkasında `uvicorn app.main:app --host 0.0.0.0 --port 8000` komutuyla çalıştırın ve anahtarı barındırma ortamının gizli değişkenlerinde tutun. Mevcut istek sınırı ve ölçümler **süreç başına bellekte** tutulur; birden fazla sunucu örneği için paylaşılan bir depo ve merkezi ölçüm sistemi gerekir. İstemcide durdurulan bir istek, sağlayıcıya ulaşmışsa kullanım maliyeti doğurabilir.
+Üretimde HTTPS arkasında `uvicorn app.main:app --host 0.0.0.0 --port 8000` komutuyla çalıştırın, `AUTH_COOKIE_SECURE=true` ayarlayın ve anahtarı barındırma ortamının gizli değişkenlerinde tutun. Mevcut istek sınırı ve ölçümler **süreç başına bellekte** tutulur; birden fazla sunucu örneği için paylaşılan bir depo ve merkezi ölçüm sistemi gerekir. İstemcide durdurulan bir istek, sağlayıcıya ulaşmışsa kullanım maliyeti doğurabilir.
 
 ## Test ve demo üretimi
 

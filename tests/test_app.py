@@ -191,6 +191,57 @@ def test_reality_check_returns_grounded_1998_summary_and_sources():
     }
 
 
+def test_account_registration_login_and_logout_use_an_http_only_session(monkeypatch):
+    database = Path(f".test-accounts-{uuid.uuid4().hex}.db")
+    monkeypatch.setenv("COMPARISON_DB_PATH", str(database))
+    credentials = {"username": "netgezgini", "password": "guclu-parola-98"}
+    try:
+        with TestClient(app) as client:
+            registered = client.post("/api/auth/register", json=credentials)
+            me = client.get("/api/auth/me")
+            logged_out = client.post("/api/auth/logout")
+            anonymous = client.get("/api/auth/me")
+            logged_in = client.post("/api/auth/login", json=credentials)
+            me_again = client.get("/api/auth/me")
+    finally:
+        database.unlink(missing_ok=True)
+
+    assert registered.status_code == 201
+    assert "HttpOnly" in registered.headers["set-cookie"]
+    assert "SameSite=lax" in registered.headers["set-cookie"]
+    assert me.json() == {"username": "netgezgini"}
+    assert logged_out.status_code == 204
+    assert anonymous.status_code == 401
+    assert logged_in.status_code == 204
+    assert me_again.json() == {"username": "netgezgini"}
+
+
+def test_signed_in_account_can_sync_chats_between_clients(monkeypatch):
+    database = Path(f".test-sync-{uuid.uuid4().hex}.db")
+    monkeypatch.setenv("COMPARISON_DB_PATH", str(database))
+    credentials = {"username": "gezgin98", "password": "baska-guclu-parola"}
+    sessions = [{
+        "id": "chat-1", "era": "1998", "title": "Modem sohbeti", "updated": 42,
+        "messages": [
+            {"role": "user", "content": "Modem nedir?", "time": "10:00"},
+            {"role": "assistant", "content": "Telefon hattıyla bağlanır.", "time": "10:01"},
+        ],
+    }]
+    try:
+        with TestClient(app) as first_client:
+            first_client.post("/api/auth/register", json=credentials)
+            saved = first_client.put("/api/sync/chats", json={"sessions": sessions})
+        with TestClient(app) as second_client:
+            second_client.post("/api/auth/login", json=credentials)
+            loaded = second_client.get("/api/sync/chats")
+    finally:
+        database.unlink(missing_ok=True)
+
+    assert saved.status_code == 204
+    assert loaded.status_code == 200
+    assert loaded.json()["sessions"] == sessions
+
+
 def test_chat_endpoint_explains_temporary_model_capacity_errors():
     app.dependency_overrides[get_chat_service] = lambda: BusyChatService()
 

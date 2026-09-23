@@ -380,6 +380,42 @@ def test_exported_json_format_can_be_imported_and_persists(page, server):
     assert page.get_by_role("button", name="2058 · Yedek sohbet").is_visible()
 
 
+def test_optional_account_merges_local_and_remote_chats_on_registration(page, server):
+    page.set_default_timeout(5000)
+    uploaded = []
+    page.add_init_script("""localStorage.setItem('retrochat-sessions-v1', JSON.stringify([{
+      id:'local-chat', era:'1998', title:'Yerel sohbet', updated:20,
+      messages:[{role:'user', content:'Yerel soru'}]
+    }]));""")
+    page.route("**/api/auth/me", lambda route: route.fulfill(status=401, content_type="application/json", body='{}'))
+    page.route("**/api/auth/register", lambda route: route.fulfill(status=201, content_type="application/json", body='{"username":"gezgin98"}'))
+
+    def sync(route):
+        if route.request.method == "GET":
+            route.fulfill(
+                status=200,
+                content_type="application/json",
+                body=json.dumps({"sessions": [{
+                    "id": "remote-chat", "era": "2058", "title": "Bulut sohbeti", "updated": 30,
+                    "messages": [{"role": "user", "content": "Bulut soru"}],
+                }]}, ensure_ascii=False),
+            )
+        else:
+            uploaded.extend(route.request.post_data_json["sessions"])
+            route.fulfill(status=204)
+
+    page.route("**/api/sync/chats", sync)
+    page.goto(server)
+    page.get_by_text("Cihazlar arası eşitle", exact=True).click()
+    page.get_by_label("Kullanıcı adı").fill("gezgin98")
+    page.get_by_label("Parola").fill("guclu-parola-98")
+    page.get_by_role("button", name="Hesap oluştur").click()
+
+    page.get_by_text("2 sohbet eşitlendi.", exact=True).wait_for()
+    assert page.get_by_role("button", name="2058 · Bulut sohbeti").is_visible()
+    assert {session["id"] for session in uploaded} == {"local-chat", "remote-chat"}
+
+
 def test_invalid_json_import_keeps_existing_chats(page, server):
     page.add_init_script("""localStorage.setItem('retrochat-sessions-v1', JSON.stringify([{
       id:'existing', era:'1998', title:'Korunan sohbet', updated:1,

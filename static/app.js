@@ -571,6 +571,84 @@ $("#import-json-input").addEventListener("change", async (event) => {
     announcement.textContent = importStatus.textContent;
   } finally { event.target.value = ""; }
 });
+function accountSessionsPayload() {
+  return sessions.map((session) => ({
+    id: session.id, era: session.era, title: session.title, updated: session.updated,
+    messages: session.messages.map((message) => ({
+      role: message.role, content: message.content,
+      ...(message.time ? { time: message.time } : {}),
+      ...(message.feedback ? { feedback: message.feedback } : {})
+    }))
+  }));
+}
+function showSignedInAccount(username) {
+  $("#account-anonymous").hidden = true;
+  $("#account-signed-in").hidden = false;
+  $("#account-name").textContent = username;
+}
+function showAnonymousAccount() {
+  $("#account-anonymous").hidden = false;
+  $("#account-signed-in").hidden = true;
+  $("#account-name").textContent = "";
+}
+async function accountError(response, fallback) {
+  try { return (await response.json()).detail?.message || fallback; }
+  catch { return fallback; }
+}
+async function syncAccountChats() {
+  const status = $("#account-status"); status.textContent = "Sohbetler eşitleniyor...";
+  const remoteResponse = await fetch("/api/sync/chats");
+  if (!remoteResponse.ok) throw new Error(await accountError(remoteResponse, "Sohbetler alınamadı."));
+  const remotePayload = await remoteResponse.json();
+  const remoteSessions = remotePayload.sessions.length
+    ? parseImportedSessions(JSON.stringify(remotePayload.sessions)) : [];
+  const merged = new Map();
+  for (const session of [...sessions, ...remoteSessions]) {
+    const current = merged.get(session.id);
+    if (!current || session.updated > current.updated) merged.set(session.id, session);
+  }
+  sessions = [...merged.values()].sort((a, b) => b.updated - a.updated).slice(0, 30);
+  if (!sessions.some((session) => session.id === activeId)) activeId = sessions[0]?.id || null;
+  if (activeId) era = currentSession().era;
+  persist(); render();
+  const saveResponse = await fetch("/api/sync/chats", {
+    method: "PUT", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sessions: accountSessionsPayload() })
+  });
+  if (!saveResponse.ok) throw new Error(await accountError(saveResponse, "Sohbetler gönderilemedi."));
+  status.textContent = `${sessions.length} sohbet eşitlendi.`;
+}
+async function authenticateAccount(path) {
+  const status = $("#account-status");
+  const credentials = { username: $("#account-username").value.trim(), password: $("#account-password").value };
+  status.textContent = "Bağlanıyor...";
+  try {
+    const response = await fetch(path, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(credentials)
+    });
+    if (!response.ok) throw new Error(await accountError(response, "Hesaba bağlanılamadı."));
+    showSignedInAccount(credentials.username.toLocaleLowerCase("tr-TR"));
+    $("#account-password").value = "";
+    await syncAccountChats();
+  } catch (error) { status.textContent = error.message; }
+}
+$("#account-register").addEventListener("click", () => authenticateAccount("/api/auth/register"));
+$("#account-login").addEventListener("click", () => authenticateAccount("/api/auth/login"));
+$("#account-sync").addEventListener("click", async () => {
+  try { await syncAccountChats(); }
+  catch (error) { $("#account-status").textContent = error.message; }
+});
+$("#account-logout").addEventListener("click", async () => {
+  await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+  showAnonymousAccount(); $("#account-status").textContent = "Bu cihazdaki sohbetler korunarak çıkış yapıldı.";
+});
+async function restoreAccount() {
+  try {
+    const response = await fetch("/api/auth/me");
+    if (!response.ok) return;
+    const account = await response.json(); showSignedInAccount(account.username);
+  } catch { /* Offline mode keeps local chats available. */ }
+}
 $("#export-text").addEventListener("click", () => {
   const text = sessions.map((session) => [
     `${session.era} · ${session.title}`,
@@ -765,6 +843,7 @@ async function loadSharedComparison() {
   } catch (error) { $("#compare-error").textContent = error.message; }
 }
 loadSharedComparison();
+restoreAccount();
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => navigator.serviceWorker.register("/service-worker.js").catch(() => {}));

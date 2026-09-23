@@ -1,5 +1,6 @@
 import os
 import asyncio
+import hashlib
 import json
 import logging
 import queue
@@ -13,7 +14,7 @@ from pathlib import Path
 from typing import Annotated, Literal
 
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from httpx import ConnectError, ConnectTimeout
@@ -168,6 +169,39 @@ class RealityCheckResponse(BaseModel):
     sources: list[RealitySource]
 
 
+class AuthCredentials(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    username: str = Field(min_length=3, max_length=32, pattern=r"^[A-Za-z0-9_.-]+$")
+    password: str = Field(min_length=10, max_length=128)
+
+    @field_validator("username")
+    @classmethod
+    def normalize_username(cls, value: str) -> str:
+        return value.lower()
+
+
+class SyncedMessage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=20000)
+    time: str | None = Field(default=None, max_length=30)
+    feedback: Literal["period_fit", "incomplete", "repetitive"] | None = None
+
+
+class SyncedChat(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: str = Field(min_length=1, max_length=100)
+    era: Literal["1998", "2058"]
+    title: str = Field(min_length=1, max_length=200)
+    updated: float
+    messages: list[SyncedMessage] = Field(max_length=100)
+
+
+class SyncPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    sessions: list[SyncedChat] = Field(max_length=30)
+
+
 def comparison_database_path() -> Path:
     return Path(os.getenv("COMPARISON_DB_PATH", str(BASE_DIR / "retrochat.db")))
 
@@ -182,7 +216,76 @@ def comparison_connection() -> sqlite3.Connection:
         future TEXT NOT NULL, expires_at INTEGER NOT NULL
         )"""
     )
+    connection.execute(
+        """CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+        password_salt TEXT NOT NULL, password_hash TEXT NOT NULL, created_at INTEGER NOT NULL
+        )"""
+    )
+    connection.execute(
+        """CREATE TABLE IF NOT EXISTS auth_sessions (
+        token_hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL, expires_at INTEGER NOT NULL,
+        FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+        )"""
+    )
+    connection.execute(
+        """CREATE TABLE IF NOT EXISTS synced_chats (
+        user_id INTEGER PRIMARY KEY, payload TEXT NOT NULL, updated_at INTEGER NOT NULL,
+        FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+        )"""
+    )
     return connection
+
+
+AUTH_COOKIE = "retrochat_session"
+AUTH_MAX_AGE = 30 * 86400
+
+
+def password_digest(password: str, salt: bytes) -> str:
+    return hashlib.scrypt(password.encode("utf-8"), salt=salt, n=2**14, r=8, p=1, dklen=32).hex()
+
+
+def session_hash(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def secure_cookie_enabled() -> bool:
+    return os.getenv("AUTH_COOKIE_SECURE", "false").lower() in {"1", "true", "yes"}
+
+
+def set_auth_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        AUTH_COOKIE, token, max_age=AUTH_MAX_AGE, httponly=True,
+        secure=secure_cookie_enabled(), samesite="lax", path="/",
+    )
+
+
+def create_auth_session(connection: sqlite3.Connection, user_id: int) -> str:
+    token = secrets.token_urlsafe(32)
+    connection.execute(
+        "INSERT INTO auth_sessions VALUES (?, ?, ?)",
+        (session_hash(token), user_id, int(time.time()) + AUTH_MAX_AGE),
+    )
+    return token
+
+
+def require_user(request: Request) -> tuple[int, str]:
+    token = request.cookies.get(AUTH_COOKIE)
+    if not token:
+        raise HTTPException(401, detail={"code": "authentication_required", "message": "Eşitlemek için giriş yap."})
+    connection = comparison_connection()
+    try:
+        row = connection.execute(
+            """SELECT users.id, users.username FROM auth_sessions
+            JOIN users ON users.id = auth_sessions.user_id
+            WHERE auth_sessions.token_hash = ? AND auth_sessions.expires_at > ?""",
+            (session_hash(token), int(time.time())),
+        ).fetchone()
+    finally:
+        connection.close()
+    if row is None:
+        raise HTTPException(401, detail={"code": "authentication_required", "message": "Oturumun sona erdi. Yeniden giriş yap."})
+    return int(row[0]), str(row[1])
 
 
 def get_chat_service(request: ChatRequest) -> GeminiChatService:
@@ -246,6 +349,93 @@ def get_shared_comparison(slug: str) -> SharedComparison:
 @app.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.post("/api/auth/register", status_code=201, dependencies=[Depends(enforce_event_limit)])
+def register(credentials: AuthCredentials, response: Response) -> dict[str, str]:
+    salt = os.urandom(16)
+    connection = comparison_connection()
+    try:
+        cursor = connection.execute(
+            "INSERT INTO users (username, password_salt, password_hash, created_at) VALUES (?, ?, ?, ?)",
+            (credentials.username, salt.hex(), password_digest(credentials.password, salt), int(time.time())),
+        )
+        token = create_auth_session(connection, int(cursor.lastrowid))
+        connection.commit()
+    except sqlite3.IntegrityError as exc:
+        raise HTTPException(409, detail={"code": "username_taken", "message": "Bu kullanıcı adı zaten alınmış."}) from exc
+    finally:
+        connection.close()
+    set_auth_cookie(response, token)
+    return {"username": credentials.username}
+
+
+@app.post("/api/auth/login", status_code=204, dependencies=[Depends(enforce_event_limit)])
+def login(credentials: AuthCredentials) -> Response:
+    connection = comparison_connection()
+    try:
+        row = connection.execute(
+            "SELECT id, password_salt, password_hash FROM users WHERE username = ?",
+            (credentials.username,),
+        ).fetchone()
+        if row is None:
+            password_digest(credentials.password, bytes(16))
+            raise HTTPException(401, detail={"code": "invalid_credentials", "message": "Kullanıcı adı veya parola hatalı."})
+        actual = password_digest(credentials.password, bytes.fromhex(row[1]))
+        if not secrets.compare_digest(actual, row[2]):
+            raise HTTPException(401, detail={"code": "invalid_credentials", "message": "Kullanıcı adı veya parola hatalı."})
+        token = create_auth_session(connection, int(row[0]))
+        connection.commit()
+    finally:
+        connection.close()
+    response = Response(status_code=204)
+    set_auth_cookie(response, token)
+    return response
+
+
+@app.post("/api/auth/logout", status_code=204)
+def logout(request: Request) -> Response:
+    token = request.cookies.get(AUTH_COOKIE)
+    if token:
+        connection = comparison_connection()
+        try:
+            connection.execute("DELETE FROM auth_sessions WHERE token_hash = ?", (session_hash(token),))
+            connection.commit()
+        finally:
+            connection.close()
+    response = Response(status_code=204)
+    response.delete_cookie(AUTH_COOKIE, path="/", secure=secure_cookie_enabled(), httponly=True, samesite="lax")
+    return response
+
+
+@app.get("/api/auth/me")
+def current_account(user: Annotated[tuple[int, str], Depends(require_user)]) -> dict[str, str]:
+    return {"username": user[1]}
+
+
+@app.get("/api/sync/chats", response_model=SyncPayload, response_model_exclude_none=True)
+def load_synced_chats(user: Annotated[tuple[int, str], Depends(require_user)]) -> SyncPayload:
+    connection = comparison_connection()
+    try:
+        row = connection.execute("SELECT payload FROM synced_chats WHERE user_id = ?", (user[0],)).fetchone()
+    finally:
+        connection.close()
+    return SyncPayload.model_validate_json(row[0]) if row else SyncPayload(sessions=[])
+
+
+@app.put("/api/sync/chats", status_code=204)
+def save_synced_chats(payload: SyncPayload, user: Annotated[tuple[int, str], Depends(require_user)]) -> Response:
+    connection = comparison_connection()
+    try:
+        connection.execute(
+            """INSERT INTO synced_chats (user_id, payload, updated_at) VALUES (?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at""",
+            (user[0], payload.model_dump_json(exclude_none=True), int(time.time())),
+        )
+        connection.commit()
+    finally:
+        connection.close()
+    return Response(status_code=204)
 
 
 @app.post("/api/reality-check", response_model=RealityCheckResponse, dependencies=[Depends(enforce_limit)])

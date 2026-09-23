@@ -435,6 +435,13 @@ body[data-era="2058"] .counter span { border: 0; color: var(--future-green); bac
 .session-exports { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .session-exports button { min-height: 44px; }
 .sessions .import-status { margin: 8px 0 0; line-height: 1.4; }
+.account-panel { margin-top: 12px; padding: 9px; border: 1px solid #777; font: 12px/1.4 Arial, sans-serif; }
+.account-panel summary { min-height: 32px; cursor: pointer; font-weight: 700; }
+.account-panel label { display: block; margin-top: 8px; font-weight: 700; }
+.account-panel input { width: 100%; min-height: 44px; margin-top: 4px; padding: 7px; border: 2px inset #fff; font: 14px Arial, sans-serif; }
+.account-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+.account-actions button { min-height: 44px; }
+.account-panel #account-status { margin: 8px 0 0; }
 .small-button { min-height: 32px; padding: 5px 9px; font: bold 12px Arial, sans-serif; }
 .session-list { display: grid; gap: 6px; max-height: 420px; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
 .session-item { width: 100%; min-height: 42px; padding: 7px 8px; border: 2px outset #fff; background: #e8e8e8; font: 12px/1.2 Arial, sans-serif; font-weight: 600; text-align: left; overflow-wrap: anywhere; }
@@ -461,6 +468,8 @@ body[data-era="2058"] .session-item[aria-current="true"] { border-color: #8bf5ff
 body[data-era="2058"] #session-search { border: 1px solid rgba(139,245,255,.28); border-radius: 10px; background: #0b1221; color: #f5f7ff; }
 body[data-era="2058"] .reading-settings { border-color: rgba(139,245,255,.28); border-radius: 10px; }
 body[data-era="2058"] .reading-settings select { border: 1px solid rgba(139,245,255,.28); border-radius: 8px; background: #0b1221; color: #f5f7ff; }
+body[data-era="2058"] .account-panel { border-color: rgba(139,245,255,.28); border-radius: 10px; }
+body[data-era="2058"] .account-panel input { border: 1px solid rgba(139,245,255,.28); border-radius: 8px; background: #0b1221; color: #f5f7ff; }
 body[data-era="2058"] .text-button { color: #ffc7d3; background: transparent; box-shadow: none; }
 body[data-era="2058"] .delete-undo { border: 1px solid rgba(139,245,255,.24); border-radius: 10px; background: rgba(139,245,255,.08); color: #e6f5fa; }
 body[data-era="2058"] .prompt-chip { min-height: 32px; border: 1px solid rgba(139,245,255,.28); border-radius: 999px; background: rgba(139,245,255,.08); color: #e5f9ff; box-shadow: none; }

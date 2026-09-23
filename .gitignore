@@ -46,4 +46,6 @@ retrochat.db
 retrochat.db-shm
 retrochat.db-wal
 .test-comparisons-*.db
+.test-accounts-*.db
+.test-sync-*.db
 .tmp/
